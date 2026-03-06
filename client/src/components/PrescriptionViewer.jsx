@@ -1,237 +1,205 @@
-import React, { useState, useEffect } from 'react';
-import { X, Download, FileText, Activity, MapPin, Phone, ShieldCheck, AlertTriangle, ShoppingCart } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Download, Pill, Activity, Loader2, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { QRCodeSVG } from 'qrcode.react'; // 🟢 NEW QR CODE LIBRARY
-import { useNavigate } from 'react-router-dom'; // 🟢 THIS IS THE MISSING PIECE!
+import { useCart } from '../context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
-const PrescriptionViewer = ({ isOpen, onClose, appointmentId }) => {
+const PrescriptionViewer = ({ isOpen, appointmentId, onClose }) => {
     const [prescription, setPrescription] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isFillingCart, setIsFillingCart] = useState(false);
+    const { addToCart } = useCart();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        if (!isOpen || !appointmentId) return;
-        const fetchRx = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(`http://localhost:5001/api/prescriptions/appointment/${appointmentId}`);
-                if (res.ok) setPrescription(await res.json());
-            } catch (e) { toast.error("Error loading Rx"); } finally { setLoading(false); }
-        };
-        fetchRx();
+        if (isOpen && appointmentId) {
+            fetchPrescription();
+        }
     }, [isOpen, appointmentId]);
 
-    const navigate = useNavigate(); // 🟢 ADD THIS
-
-    // 🛒 MAGIC CART FUNCTION
-    const handleMagicCart = async () => {
-        const toastId = toast.loading("Scanning Health Hive Pharmacy...");
-
+    const fetchPrescription = async () => {
+        setIsLoading(true);
         try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/appointment/${appointmentId}/magic-cart`, {
-                method: "POST"
-            });
-
-            const data = await res.json();
-
+            const res = await fetch(`http://localhost:5001/api/prescriptions/appointment/${appointmentId}`);
             if (res.ok) {
-                if (data.foundCount === 0) {
-                    toast.error("None of these medicines are currently in stock.", { id: toastId });
-                    return;
-                }
-
-                toast.success(`Found ${data.foundCount} of ${data.totalCount} medicines!`, { id: toastId });
-
-                // Save the matched products to LocalStorage so the Pharmacy page can grab them
-                // (If you use Redux/Context for your cart, you can dispatch it here instead!)
-                const existingCart = JSON.parse(localStorage.getItem('mediflow_cart')) || [];
-
-                // Add new items (preventing exact duplicates based on ID)
-                const newCart = [...existingCart];
-                data.matchedProducts.forEach(product => {
-                    if (!newCart.find(item => item._id === product._id)) {
-                        newCart.push({ ...product, quantity: 1 }); // Default to 1 pack
-                    }
-                });
-
-                localStorage.setItem('mediflow_cart', JSON.stringify(newCart));
-
-                // 🟢 LEAVE A SECRET NOTE FOR THE PHARMACY PAGE
-                sessionStorage.setItem('autofill_success', 'true');
-
-                // Close modal and force a hard redirect to the ACTUAL store page
-                onClose();
-                window.location.href = '/pharmacy';
-
+                const data = await res.json();
+                setPrescription(data.data || data);
             } else {
-                toast.error(data.message || "Failed to scan pharmacy", { id: toastId });
+                toast.error("Failed to load prescription");
+                setPrescription(null);
             }
         } catch (error) {
-            toast.error("Server Error", { id: toastId });
+            console.error("Error fetching prescription:", error);
+            toast.error("Error loading prescription");
+            setPrescription(null);
+        } finally {
+            setIsLoading(false);
         }
-    };
-
-    const downloadPDF = async () => {
-        const element = document.getElementById('prescription-content');
-        if (!element) return;
-        const toastId = toast.loading("Generating Secure PDF...");
-        try {
-            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`MediFlow_Rx_${prescription.patientId?.fullName}.pdf`);
-            toast.success("Downloaded!", { id: toastId });
-        } catch (e) { toast.error("PDF Failed", { id: toastId }); }
     };
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto">
-            <div className="bg-[#e2e8f0] rounded-2xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
+    const handleDownloadPDF = () => {
+        window.print(); 
+    };
 
-                {/* Toolbar */}
-                <div className="flex items-center justify-between p-4 bg-slate-800 text-white rounded-t-2xl shrink-0">
-                    <div className="flex items-center gap-2 font-display font-bold"><ShieldCheck className="w-5 h-5 text-emerald-400" /> Secure Medical Record</div>
-                    <div className="flex gap-3">
-                        {/* 🟢 THE MAGIC CART BUTTON */}
-                        {prescription?.medicines?.length > 0 && (
-                            <button
-                                onClick={handleMagicCart}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center shadow-lg shadow-emerald-500/20 transition-all transform hover:scale-105"
-                            >
-                                <ShoppingCart className="w-4 h-4" /> Auto-Fill Cart
-                            </button>
-                        )}
-                        <button onClick={downloadPDF} className="bg-[#5747e6] hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-bold flex gap-2 items-center"><Download className="w-4 h-4" /> Print / PDF</button>
-                        <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg"><X className="w-5 h-5" /></button>
+    const handleAutofillCart = async () => {
+        if (!appointmentId) return;
+        
+        setIsFillingCart(true);
+        const toastId = toast.loading("Matching medicines to pharmacy...");
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/appointment/${appointmentId}/magic-cart`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                
+                if (data.matchedProducts && data.matchedProducts.length > 0) {
+                    // Add each matched product to cart
+                    data.matchedProducts.forEach(product => {
+                        addToCart(product);
+                    });
+                    
+                    toast.success(
+                        `Added ${data.foundCount}/${data.totalCount} medicines to cart!`,
+                        { id: toastId }
+                    );
+                    
+                    if (data.missingProducts && data.missingProducts.length > 0) {
+                        toast(`Could not find: ${data.missingProducts.join(", ")}`, {
+                            icon: "⚠️",
+                            duration: 4000
+                        });
+                    }
+                    
+                    // Close modal and navigate to cart
+                    onClose();
+                    navigate("/cart");
+                } else {
+                    toast.error("No matching products found in pharmacy", { id: toastId });
+                }
+            } else {
+                toast.error("Failed to match medicines", { id: toastId });
+            }
+        } catch (error) {
+            console.error("Autofill Cart Error:", error);
+            toast.error("Error filling cart", { id: toastId });
+        } finally {
+            setIsFillingCart(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl p-12 flex flex-col items-center gap-4">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#5747e6]" />
+                    <p className="text-slate-600 font-medium">Loading prescription...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!prescription) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 max-w-sm">
+                    <p className="text-slate-600 font-medium">No prescription found for this appointment</p>
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-[#5747e6] text-white rounded-lg font-bold"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm print:bg-white print:p-0">
+            <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 print:shadow-none print:max-w-none">
+                
+                {/* Header (Hidden on Print) */}
+                <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50 print:hidden">
+                    <h2 className="text-xl font-bold font-display text-slate-900 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-[#5747e6]" /> Official e-Prescription
+                    </h2>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* THE ACTUAL PRESCRIPTION */}
+                <div className="p-8 print:p-0">
+                    <div className="flex justify-between items-start mb-8 border-b-2 border-[#5747e6] pb-6">
+                        <div>
+                            <h1 className="text-3xl font-bold font-display text-slate-900">MediFlow AI</h1>
+                            <p className="text-sm text-slate-500 mt-1">Digital Telehealth Clinic</p>
+                            <p className="text-sm font-bold text-slate-700 mt-4">Patient: {prescription.patientId?.fullName || "Unknown Patient"}</p>
+                        </div>
+                        <div className="text-right">
+                            <h3 className="font-bold text-lg text-slate-900">Dr. {prescription.doctorId?.name || prescription.doctorId?.fullName || "Physician"}</h3>
+                            <p className="text-sm text-slate-500 mt-2 font-medium">Date: {new Date(prescription.createdAt).toLocaleDateString()}</p>
+                            <p className="text-xs text-slate-400 font-mono mt-1">Ref: {prescription._id}</p>
+                        </div>
+                    </div>
+
+                    <div className="text-5xl font-serif font-black text-slate-200 mb-6">Rx</div>
+
+                    <div className="space-y-4 mb-8">
+                        {prescription.medicines?.map((med, idx) => (
+                            <div key={idx} className="flex items-start gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50 print:border-none print:bg-transparent print:p-2">
+                                <div className="p-2 bg-indigo-100 text-[#5747e6] rounded-lg print:hidden">
+                                    <Pill className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold text-slate-900">{med.drugName || med.name} <span className="text-sm font-medium text-slate-500 ml-2">{med.dosage}</span></h4>
+                                    <p className="text-sm text-slate-600 mt-1 flex items-center gap-4">
+                                        <span><strong className="text-slate-700">Freq:</strong> {med.frequency || med.timing}</span>
+                                        <span><strong className="text-slate-700">Duration:</strong> {med.duration} days</span>
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {prescription.diagnosis && (
+                        <div className="mb-8 p-4 bg-amber-50 border border-amber-100 rounded-xl print:bg-transparent print:border-none print:p-0">
+                            <p className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-1">Diagnosis / Notes</p>
+                            <p className="text-sm text-amber-900 print:text-slate-800 italic">{prescription.diagnosis}</p>
+                        </div>
+                    )}
+                    
+                    <div className="hidden print:flex justify-end mt-16 pt-8">
+                        <div className="text-center">
+                            <div className="border-t border-slate-400 w-48 mb-2"></div>
+                            <p className="text-sm font-bold">Electronically Signed</p>
+                            <p className="text-xs text-slate-500">Dr. {prescription.doctorId?.name || prescription.doctorId?.fullName}</p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center">
-                    {loading ? <div className="text-slate-500 animate-pulse mt-20">Decrypting Document...</div> : prescription && (
-
-                        /* 📄 HOSPITAL PDF DOCUMENT */
-                        <div id="prescription-content" className="bg-white p-10 shadow-xl w-[210mm] min-h-[297mm] text-slate-900 font-sans relative border-t-8 border-[#5747e6]">
-
-                            {/* Header */}
-                            <header className="flex justify-between items-start border-b-2 border-slate-100 pb-6 mb-6">
-                                <div>
-                                    <h1 className="text-3xl font-black font-display text-[#100e1b] flex items-center gap-2">
-                                        <Activity className="w-8 h-8 text-[#5747e6]" /> MediFlow AI
-                                    </h1>
-                                    <p className="text-slate-500 text-sm mt-1">NPI: {prescription.verification?.hospitalRegNumber || "HOSP-0000"} | Reg: ISO 9001:2015</p>
-                                </div>
-                                <div className="text-right text-xs text-slate-500">
-                                    <p>123 Health Ave, Medical City, NY 10001</p>
-                                    <p>Phone: +1 (800) 555-0199 | www.mediflow.ai</p>
-                                    <p className="font-bold text-slate-800 mt-2">Date: {new Date(prescription.createdAt).toLocaleDateString()}</p>
-                                </div>
-                            </header>
-
-                            {/* Patient & Vitals Row */}
-                            <div className="mb-6 flex gap-4">
-                                <div className="flex-1 border border-slate-200 rounded-lg p-4 bg-slate-50">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400">Patient Information</p>
-                                    <h3 className="font-bold text-lg text-slate-900">{prescription.patientId?.fullName}</h3>
-                                    <p className="text-xs text-slate-500">ID: {prescription.patientId?._id?.slice(-8).toUpperCase()}</p>
-                                </div>
-                                {prescription.vitals && (
-                                    <div className="flex-[2] border border-slate-200 rounded-lg p-4 flex justify-between items-center bg-white">
-                                        <div className="text-center"><p className="text-[10px] text-slate-400 uppercase font-bold">BP</p><p className="font-bold text-sm">{prescription.vitals.bp || '-'}</p></div>
-                                        <div className="text-center"><p className="text-[10px] text-slate-400 uppercase font-bold">Pulse</p><p className="font-bold text-sm">{prescription.vitals.pulse || '-'}</p></div>
-                                        <div className="text-center"><p className="text-[10px] text-slate-400 uppercase font-bold">Temp</p><p className="font-bold text-sm">{prescription.vitals.temp || '-'}</p></div>
-                                        <div className="text-center"><p className="text-[10px] text-slate-400 uppercase font-bold">Weight</p><p className="font-bold text-sm">{prescription.vitals.weight || '-'}</p></div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Allergies Warning */}
-                            {prescription.allergies && prescription.allergies !== "None Known" && (
-                                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm font-bold">
-                                    <AlertTriangle className="w-5 h-5" /> ALLERGIES: {prescription.allergies}
-                                </div>
-                            )}
-
-                            {/* Diagnosis */}
-                            <div className="mb-8">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase mb-1 border-b border-slate-100 pb-1">Primary Diagnosis</h4>
-                                <p className="text-sm font-bold text-slate-800">{prescription.diagnosis}</p>
-                            </div>
-
-                            {/* Medications Table */}
-                            <div className="mb-10 min-h-[250px]">
-                                <h2 className="text-5xl font-black font-serif italic text-slate-900 mb-6">Rx</h2>
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-100">
-                                            <th className="py-2 px-3 text-[10px] uppercase font-bold text-slate-500 border border-slate-200 rounded-tl-lg">Medicine & Strength</th>
-                                            <th className="py-2 px-3 text-[10px] uppercase font-bold text-slate-500 border border-slate-200">Route</th>
-                                            <th className="py-2 px-3 text-[10px] uppercase font-bold text-slate-500 border border-slate-200">Frequency</th>
-                                            <th className="py-2 px-3 text-[10px] uppercase font-bold text-slate-500 border border-slate-200">Days</th>
-                                            <th className="py-2 px-3 text-[10px] uppercase font-bold text-slate-500 border border-slate-200 rounded-tr-lg">Instructions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {prescription.medicines?.map((med, idx) => (
-                                            <tr key={idx} className="border-b border-slate-200">
-                                                <td className="py-3 px-3">
-                                                    <p className="font-bold text-sm text-slate-900">{med.name}</p>
-                                                    <p className="text-xs text-slate-500">{med.strengthForm || med.dosage /* Fallback for old Rx */}</p>
-                                                </td>
-                                                <td className="py-3 px-3 text-sm text-slate-700">{med.route || 'Oral'}</td>
-                                                <td className="py-3 px-3 text-sm font-bold text-slate-700">{med.frequency || med.dosage}</td>
-                                                <td className="py-3 px-3 text-sm text-slate-700">{med.days || med.duration}</td>
-                                                <td className="py-3 px-3 text-xs text-slate-600 italic">{med.instructions || "-"}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Follow Up & Doctor Verification Block */}
-                            <div className="mt-auto border-t-2 border-slate-800 pt-6 flex justify-between items-end">
-
-                                {/* 🟢 QR CODE & METADATA */}
-                                <div className="flex items-center gap-4">
-                                    <div className="p-1 border-2 border-slate-200 rounded bg-white">
-                                        <QRCodeSVG
-                                            value={`https://mediflow.ai/verify/${prescription.verification?.signatureHash || prescription._id}`}
-                                            size={64}
-                                            level="L"
-                                        />
-                                    </div>
-                                    <div className="text-[9px] text-slate-400 font-mono leading-tight">
-                                        <p className="text-slate-600 font-bold mb-1 uppercase font-sans">Document Security Hash</p>
-                                        <p>TS: {new Date(prescription.createdAt).toISOString()}</p>
-                                        <p>DOC: {prescription.doctorId?._id}</p>
-                                        <p>PAT: {prescription.patientId?._id}</p>
-                                        <p className="break-all max-w-[150px]">SIG: {prescription.verification?.signatureHash || "UNVERIFIED"}</p>
-                                    </div>
-                                </div>
-
-                                {/* SIGNATURE & LICENSE */}
-                                <div className="text-center">
-                                    {prescription.signature && <img src={prescription.signature} alt="Sign" className="h-16 mx-auto mix-blend-multiply mb-1" />}
-                                    <div className="border-t border-slate-300 pt-1 px-4">
-                                        <p className="font-bold text-slate-900 text-sm">Dr. {prescription.doctorId?.name}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase">{prescription.doctorId?.specialization}</p>
-                                        <p className="text-[10px] text-slate-500 mt-0.5">Lic: {prescription.verification?.licenseNumber || "MED-5932-TX"}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Hidden Footer string for SuperAdmin scraping */}
-                            <div className="absolute bottom-2 left-10 text-[6px] text-transparent select-all">
-                                {`[MEDIFLOW-META]-${prescription._id}-${prescription.doctorId?._id}-${Date.now()}`}
-                            </div>
-
-                        </div>
-                    )}
+                <div className="p-6 border-t border-slate-100 bg-white flex justify-between print:hidden">
+                    <button 
+                        onClick={handleAutofillCart} 
+                        disabled={isFillingCart}
+                        className="flex items-center gap-2 py-3 px-6 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isFillingCart ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <ShoppingCart className="w-5 h-5" />
+                        )}
+                        {isFillingCart ? "Adding..." : "Autofill Cart"}
+                    </button>
+                    <button onClick={handleDownloadPDF} className="flex items-center gap-2 py-3 px-6 bg-[#5747e6] text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                        <Download className="w-5 h-5" /> Download / Print PDF
+                    </button>
                 </div>
             </div>
         </div>

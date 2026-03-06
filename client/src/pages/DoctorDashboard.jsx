@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import PrescriptionModal from '../components/PrescriptionModal';
 import XRayScanner from './XRayScanner';
-import LabTests from './LabTests'; // 🟢 ADD THIS
+import LabTests from './LabTests';
+import ClinicalReportBuilder from '../components/ClinicalReportBuilder'; // 🟢 ADD THIS
+import VideoConsultation from '../components/VideoConsultation'; // 🟢 ADD IMPORT
 
 const DoctorDashboard = () => {
     const { user, logout } = useAuth();
@@ -22,6 +24,7 @@ const DoctorDashboard = () => {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedAppointmentForRx, setSelectedAppointmentForRx] = useState(null);
+    const [activeCallLink, setActiveCallLink] = useState(null); // 🟢 ADD STATE
 
     // 🛡️ SECURITY BOUNCER
     useEffect(() => {
@@ -159,7 +162,23 @@ const DoctorDashboard = () => {
                                     setActivePatient(patientData);
                                     setActiveTab('xray');
                                 }}
+                                onWriteReport={(patientData) => { // 🟢 ROUTE TO REPORT
+                                    setActivePatient(patientData);
+                                    setActiveTab('report');
+                                }}
                             />
+                        ) : activeTab === 'report' && activePatient ? ( // 🟢 RENDER REPORT BUILDER
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <ClinicalReportBuilder
+                                    patient={activePatient}
+                                    onBack={() => setActiveTab('profile')}
+                                    onSave={(payload) => {
+                                        console.log("Saving to DB...", payload);
+                                        // In the future, this makes a POST request to save the RAG payload
+                                        setActiveTab('profile');
+                                    }}
+                                />
+                            </div>
                         ) : activeTab === 'research' ? (
                             <LabResearchView
                                 appointments={appointments}
@@ -197,6 +216,15 @@ const DoctorDashboard = () => {
                     </div>
                 </div>
             </main>
+
+            {/* 🟢 RENDER VIDEO CALL IF ACTIVE */}
+            {activeCallLink && (
+                <VideoConsultation 
+                    meetLink={activeCallLink}
+                    userName={user?.fullName || user?.name || "Dr. MediFlow"}
+                    onEndCall={() => setActiveCallLink(null)}
+                />
+            )}
         </div>
     );
 };
@@ -287,8 +315,9 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
                                                 <User className="w-4 h-4" /> View Profile
                                             </button>
 
+                                            {/* 🟢 DOCTOR VIDEO BUTTON */}
                                             <button
-                                                onClick={() => window.open(appt.meetingLink, "_blank")}
+                                                onClick={() => setActiveCallLink(appt.meetLink)}
                                                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-[#100e1b] rounded-lg font-bold text-sm hover:border-[#5747e6] hover:text-[#5747e6] transition-all"
                                             >
                                                 <Video className="w-4 h-4" /> Start Call
@@ -328,7 +357,7 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
 };
 
 // --- 👤 PATIENT PROFILE VIEW ---
-const PatientProfileView = ({ patient, appointments, onBack, onStartXRay }) => {
+const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWriteReport }) => {
 
     // 🟢 DYNAMICALLY GET REAL LABS FOR THIS PATIENT
     const pastLabs = appointments.filter(appt =>
@@ -352,12 +381,21 @@ const PatientProfileView = ({ patient, appointments, onBack, onStartXRay }) => {
                         <p className="text-sm text-[#575095] font-medium mt-1">Patient ID: {patient?._id || "N/A"} • Profile Access Verified</p>
                     </div>
                 </div>
-                <button
-                    onClick={() => onStartXRay(patient)}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#5747e6] text-white rounded-xl font-bold shadow-lg shadow-[#5747e6]/20 hover:bg-indigo-700 transition-all">
-                    <Scan className="w-5 h-5" />
-                    New AI X-Ray Scan
-                </button>
+                {/* 🟢 NEW ACTION BUTTONS */}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => onWriteReport(patient)}
+                        className="flex items-center gap-2 px-6 py-3 bg-white border border-[#5747e6] text-[#5747e6] rounded-xl font-bold shadow-sm hover:bg-indigo-50 transition-all">
+                        <FileText className="w-5 h-5" />
+                        Write Clinical Report
+                    </button>
+                    <button
+                        onClick={() => onStartXRay(patient)}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#5747e6] text-white rounded-xl font-bold shadow-lg shadow-[#5747e6]/20 hover:bg-indigo-700 transition-all">
+                        <Scan className="w-5 h-5" />
+                        New AI X-Ray Scan
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

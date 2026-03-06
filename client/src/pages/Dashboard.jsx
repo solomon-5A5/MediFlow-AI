@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import DoctorList from '../components/DoctorList'; // 👈 Our shiny new component
 import PrescriptionViewer from '../components/PrescriptionViewer';
+import VideoConsultation from '../components/VideoConsultation'; // 🟢 ADD IMPORT
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [appointmentToCancel, setAppointmentToCancel] = useState(null);
   const [selectedAppointmentForView, setSelectedAppointmentForView] = useState(null); // 🟢 State for viewer
+  const [activeCallLink, setActiveCallLink] = useState(null); // 🟢 ADD STATE
 
   // --- SECURITY ---
   useEffect(() => {
@@ -251,7 +253,8 @@ const Dashboard = () => {
 
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row items-center gap-3">
-                      <button onClick={() => window.open(appt.meetingLink, "_blank")} className="w-full sm:w-auto bg-[#5747e6] hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all shadow-lg shadow-[#5747e6]/30 flex gap-2 items-center justify-center">
+                      {/* 🟢 PATIENT VIDEO BUTTON */}
+                      <button onClick={() => setActiveCallLink(appt.meetLink)} className="w-full sm:w-auto bg-[#5747e6] hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all shadow-lg shadow-[#5747e6]/30 flex gap-2 items-center justify-center">
                         <Video className="w-5 h-5" /> Join Call
                       </button>
                       <button
@@ -396,6 +399,15 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 🟢 RENDER VIDEO CALL IF ACTIVE */}
+      {activeCallLink && (
+        <VideoConsultation 
+          meetLink={activeCallLink}
+          userName={user?.fullName || user?.name || "MediFlow User"}
+          onEndCall={() => setActiveCallLink(null)} // Closes the overlay
+        />
       )}
 
     </div>

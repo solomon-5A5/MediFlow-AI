@@ -1,3 +1,4 @@
+const crypto = require("crypto"); // 🟢 Import built-in crypto module
 const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
 const cloudinary = require('cloudinary').v2;
@@ -42,6 +43,10 @@ const bookAppointment = async (req, res) => {
       console.log("✅ Upload successful:", attachedReportUrl);
     }
 
+    // 🟢 Generate a highly secure, unique Jitsi room link
+    const uniqueRoomId = crypto.randomBytes(12).toString("hex");
+    const meetLink = `https://meet.jit.si/MediFlow_Consultation_${uniqueRoomId}`;
+
     const newAppointment = new Appointment({
       patientId,
       doctorId,
@@ -49,7 +54,8 @@ const bookAppointment = async (req, res) => {
       timeSlot,
       reason,
       attachedReportUrl,
-      attachedReportName
+      attachedReportName,
+      meetLink // 🟢 Save the link to the database!
     });
 
     await newAppointment.save();

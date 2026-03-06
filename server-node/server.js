@@ -66,6 +66,7 @@ app.use("/api/lab-tests", require("./routes/labTest.route"));
 app.use("/api/users", require("./routes/user.route"));
 app.use("/api/prescriptions", require("./routes/prescription.route")); // 🟢 Prescriptions Route
 app.use("/api/vision", imageRoutes);
+app.use("/api/reports", require("./routes/report.route")); // 🟢 Clinical Reports Route
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

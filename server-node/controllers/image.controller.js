@@ -1,62 +1,83 @@
-const ImagingReport = require("../models/imagingReport.model"); // 🟢 IMPORT MODEL
+const ImagingReport = require("../models/imagingReport.model");
+const axios = require("axios");
+const FormData = require("form-data");
 
-// Native fetch and FormData are available in Node.js 18+
 const analyzeImage = async (req, res) => {
+    // Legacy endpoint — kept for backward compatibility
+};
+
+const analyzeImageV2 = async (req, res) => {
     try {
         const file = req.file;
-        if (!file) {
-            return res.status(400).json({ message: "No image uploaded." });
-        }
+        // 🟢 FIX #1: Extract clinical data sent from React (default to empty JSON string)
+        const clinicalData = req.body.clinical_data || "{}";
 
-        console.log(`🩻 Forwarding X-Ray to Python AI: ${file.originalname}`);
+        if (!file) return res.status(400).json({ message: "No image uploaded." });
 
-        // 1. Package the image buffer to send to Python
         const formData = new FormData();
-        const blob = new Blob([file.buffer], { type: file.mimetype });
-        formData.append("file", blob, file.originalname);
-
-        // 2. Call your Python Microservice (Port 8000)
-        const pythonResponse = await fetch("http://localhost:8000/api/vision/analyze", {
-            method: "POST",
-            body: formData
+        formData.append("file", file.buffer, {
+            filename: file.originalname,
+            contentType: file.mimetype
         });
 
-        if (!pythonResponse.ok) {
-            throw new Error(`Python AI Service Error: ${pythonResponse.statusText}`);
-        }
+        // 🟢 FIX #1: Append clinical data to the form sent to Python
+        formData.append("clinical_data", clinicalData);
 
-        // 3. Parse the JSON from Python
-        const aiResult = await pythonResponse.json();
+        const pythonResponse = await axios.post("http://127.0.0.1:8000/api/vision/analyze", formData, {
+            headers: formData.getHeaders()
+        });
 
-        // 4. Send the final structured result back to the React Frontend
         res.status(200).json({
-            message: "X-Ray Analyzed Successfully",
-            data: aiResult
+            message: "Multimodal Analysis Completed",
+            data: pythonResponse.data
         });
 
     } catch (error) {
-        console.error("Vision AI Bridge Error:", error);
-        res.status(500).json({ message: "Failed to process X-Ray image via AI service." });
+        const rawError = String(error);
+        const detailedStack = error.response?.data || error.stack || "No stack trace available";
+        console.error("Multimodal Bridge Error:", rawError);
+
+        res.status(500).json({
+            message: `Multimodal analysis failed: ${rawError}`,
+            details: detailedStack
+        });
     }
 };
 
-// 🟢 NEW: Save the finalized AI report to MongoDB
+// 🟢 FIX #4: Cleaned up saveReport to match Python's multimodal payload keys exactly
 const saveReport = async (req, res) => {
     try {
-        const { prediction, confidence, notes } = req.body;
+        const {
+            primary_flag,
+            flag_confidence,
+            patientId,
+            high_priority_findings,
+            secondary_anomalies,
+            evaluated_negative,
+            risk_score,
+            overall_status,
+            clinical_suggestion,
+            notes
+        } = req.body;
 
         const newReport = new ImagingReport({
-            prediction,
-            confidence,
-            radiologistNotes: notes || "AI findings verified by attending radiologist."
+            patientId,
+            prediction: primary_flag,
+            confidence: flag_confidence,
+            high_priority_findings,
+            secondary_anomalies,
+            evaluated_negative,
+            risk_score,
+            overall_status,
+            clinical_suggestion,
+            radiologistNotes: notes || "AI-assisted multimodal triage. Awaiting physician validation."
         });
 
         await newReport.save();
-
-        console.log(`💾 X-Ray Report Saved: ${newReport._id}`);
+        console.log(`💾 Multimodal Report Saved: ${newReport._id}`);
 
         res.status(201).json({
-            message: "Report finalized and securely saved to database.",
+            message: "Multimodal triage report finalized and securely saved.",
             report: newReport
         });
 
@@ -66,12 +87,10 @@ const saveReport = async (req, res) => {
     }
 };
 
-// 🟢 NEW: Fetch all finalized reports for a specific patient
 const getPatientReports = async (req, res) => {
     try {
         const { patientId } = req.params;
-        const reports = await ImagingReport.find({ patientId }).sort({ createdAt: -1 }); // Newest first
-
+        const reports = await ImagingReport.find({ patientId }).sort({ createdAt: -1 });
         res.status(200).json(reports);
     } catch (error) {
         console.error("Error fetching patient reports:", error);
@@ -79,4 +98,4 @@ const getPatientReports = async (req, res) => {
     }
 };
 
-module.exports = { analyzeImage, saveReport, getPatientReports }; // 🟢 EXPORT IT
+module.exports = { analyzeImage, analyzeImageV2, saveReport, getPatientReports };

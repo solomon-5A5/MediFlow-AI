@@ -5,9 +5,14 @@ import {
    Shield, LayoutDashboard, Eye, ShoppingCart, Calendar,
    Activity, Settings, LogOut, Search, Bell, Users,
    Server, AlertTriangle, CheckCircle, Clock, FileText, MapPin,
-   Stethoscope, Upload, Loader2, Pill, FlaskConical // 🟢 ADDED FlaskConical
+   Stethoscope, Upload, Loader2, Pill, FlaskConical, FileCheck,
+   Download // 🟢 Added Download Icon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// 🟢 IMPORT THE MODALS
+import PrescriptionViewer from '../components/PrescriptionViewer';
+import ClinicalReportViewer from '../components/ClinicalReportViewer';
 
 const SuperAdminDashboard = () => {
    const { user, logout } = useAuth();
@@ -21,35 +26,38 @@ const SuperAdminDashboard = () => {
    const [usersList, setUsersList] = useState([]);
    const [doctors, setDoctors] = useState([]);
    const [prescriptions, setPrescriptions] = useState([]);
-   const [labAppointments, setLabAppointments] = useState([]); // 🟢 NEW: Lab Appointments State
+   const [labAppointments, setLabAppointments] = useState([]); 
+   const [clinicalReports, setClinicalReports] = useState([]); 
    const [uploadingId, setUploadingId] = useState(null);
    const [loading, setLoading] = useState(true);
+
+   // 🟢 MODAL VIEW STATE
+   const [selectedPrescription, setSelectedPrescription] = useState(null);
+   const [selectedReport, setSelectedReport] = useState(null);
 
    // Stats Calculation
    const totalRevenue = orders.reduce((acc, order) => acc + (order.totalAmount || 0), 0);
    const securityEvents = logs.length;
    const onlineUsers = usersList.filter(u => u.isOnline).length;
 
-   // --- SECURITY CHECK ---
    useEffect(() => {
       if (user && user.role !== 'superadmin') {
          navigate("/dashboard");
       }
    }, [user, navigate]);
 
-   // --- FETCH DATA ---
    useEffect(() => {
       const fetchAdminData = async () => {
          try {
-            // 🟢 Added the lab-appointments fetch to the Promise.all
-            const [logsRes, ordersRes, apptRes, usersRes, docsRes, rxRes, labRes] = await Promise.all([
+            const [logsRes, ordersRes, apptRes, usersRes, docsRes, rxRes, labRes, reportsRes] = await Promise.all([
                fetch("http://localhost:5001/api/admin/logs"),
                fetch("http://localhost:5001/api/admin/all-orders"),
                fetch("http://localhost:5001/api/admin/all-appointments"),
                fetch("http://localhost:5001/api/users"),
                fetch("http://localhost:5001/api/doctors"),
                fetch("http://localhost:5001/api/prescriptions/all"),
-               fetch("http://localhost:5001/api/admin/all-lab-appointments") // 🟢 FETCH LAB DATA
+               fetch("http://localhost:5001/api/admin/all-lab-appointments"), 
+               fetch("http://localhost:5001/api/reports/admin/all") 
             ]);
 
             if (logsRes.ok) setLogs(await logsRes.json());
@@ -58,7 +66,8 @@ const SuperAdminDashboard = () => {
             if (usersRes.ok) setUsersList(await usersRes.json());
             if (docsRes.ok) setDoctors(await docsRes.json());
             if (rxRes.ok) setPrescriptions(await rxRes.json());
-            if (labRes.ok) setLabAppointments(await labRes.json()); // 🟢 SET LAB DATA
+            if (labRes.ok) setLabAppointments(await labRes.json()); 
+            if (reportsRes.ok) setClinicalReports(await reportsRes.json()); 
          } catch (error) {
             console.error("Admin Load Error:", error);
          } finally {
@@ -125,10 +134,9 @@ const SuperAdminDashboard = () => {
                   <SidebarItem icon={Users} label={`Users Map (${onlineUsers} Online)`} active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
                   <SidebarItem icon={Stethoscope} label="Manage Doctors" active={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')} />
                   <SidebarItem icon={FileText} label="E-Prescriptions" active={activeTab === 'prescriptions'} onClick={() => setActiveTab('prescriptions')} />
+                  <SidebarItem icon={FileCheck} label="Clinical Reports" active={activeTab === 'clinical_reports'} onClick={() => setActiveTab('clinical_reports')} />
                   <SidebarItem icon={ShoppingCart} label="Global Orders" active={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
                   <SidebarItem icon={Calendar} label="Master Schedule" active={activeTab === 'appointments'} onClick={() => setActiveTab('appointments')} />
-
-                  {/* 🟢 NEW LAB SCHEDULE NAVIGATION BUTTON */}
                   <SidebarItem icon={FlaskConical} label="Lab Schedule" active={activeTab === 'lab_schedule'} onClick={() => setActiveTab('lab_schedule')} />
                </nav>
             </div>
@@ -157,16 +165,104 @@ const SuperAdminDashboard = () => {
             <div className="flex-1 overflow-y-auto p-8">
                <div className="max-w-7xl mx-auto space-y-8">
 
-                  {/* Metrics Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                      <StatCard icon={Users} label="Total Users" value={usersList.length} trend={`${onlineUsers} Active Now`} />
                      <StatCard icon={Activity} label="Total Revenue" value={`₹${totalRevenue}`} trend="+5%" trendColor="text-emerald-600" />
                      <StatCard icon={FlaskConical} label="Lab Bookings" value={labAppointments.length} trend="Total Scheduled" trendColor="text-indigo-600" />
-                     <StatCard icon={Shield} label="Security Events" value={securityEvents} trend="Active" trendColor="text-blue-600" />
+                     <StatCard icon={FileCheck} label="Clinical Reports" value={clinicalReports.length} trend="Securely Stored" trendColor="text-[#5747e6]" />
                   </div>
 
-                  {/* --- EXISTING VIEWS --- */}
-                  {activeTab === 'users' && ( /* ... Users View ... */
+                  {/* 🟢 CLINICAL REPORTS VIEW WITH VIEW BUTTON */}
+                  {activeTab === 'clinical_reports' && (
+                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileCheck className="w-4 h-4 text-[#5747e6]" /> Platform Clinical Reports</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
+                                 <tr>
+                                    <th className="px-6 py-4">Date Filed</th>
+                                    <th className="px-6 py-4">Doctor</th>
+                                    <th className="px-6 py-4">Patient Name</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
+                                    <th className="px-6 py-4 text-right">Actions</th> {/* 🟢 Added Actions */}
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-sm">
+                                 {clinicalReports.map(report => (
+                                    <tr key={report._id} className="hover:bg-slate-50 transition-colors">
+                                       <td className="px-6 py-4 text-slate-500 text-xs font-mono">{new Date(report.createdAt).toLocaleDateString()}</td>
+                                       <td className="px-6 py-4 font-bold text-[#5747e6]">Dr. {report.doctorId?.fullName || report.doctorId?.name || "Unknown"}</td>
+                                       <td className="px-6 py-4 font-bold text-slate-700">{report.patientId?.fullName || "Unknown"}</td>
+                                       <td className="px-6 py-4 text-center">
+                                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${report.status === 'finalized' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                                             {report.status}
+                                          </span>
+                                       </td>
+                                       {/* 🟢 THE VIEW BUTTON */}
+                                       <td className="px-6 py-4 text-right">
+                                           <button 
+                                                onClick={() => setSelectedReport(report)}
+                                                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100">
+                                                <Eye className="w-3 h-3" /> View Document
+                                           </button>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {clinicalReports.length === 0 && (
+                                    <tr><td colSpan="5" className="p-12 text-center text-slate-400 bg-slate-50/50">No clinical reports filed yet.</td></tr>
+                                 )}
+                              </tbody>
+                           </table>
+                        </div>
+                     </div>
+                  )}
+
+                  {/* 🟢 PRESCRIPTIONS VIEW WITH VIEW BUTTON */}
+                  {activeTab === 'prescriptions' && (
+                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText className="w-4 h-4 text-[#5747e6]" /> E-Prescription Audit Log</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
+                                 <tr>
+                                    <th className="px-6 py-4">Date Issued</th><th className="px-6 py-4">Doctor</th><th className="px-6 py-4">Patient</th><th className="px-6 py-4">Drugs</th><th className="px-6 py-4 text-right">Actions</th> {/* 🟢 Added Actions */}
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-sm">
+                                 {prescriptions.map(rx => (
+                                    <tr key={rx._id} className="hover:bg-slate-50">
+                                       <td className="px-6 py-4 text-slate-500 text-xs font-mono">{new Date(rx.createdAt).toLocaleDateString()}</td>
+                                       <td className="px-6 py-4 font-bold text-[#5747e6]">Dr. {rx.doctorId?.name || rx.doctorId?.fullName || "Unknown"}</td>
+                                       <td className="px-6 py-4 font-bold text-slate-700">{rx.patientId?.fullName || "Unknown"}</td>
+                                       <td className="px-6 py-4">
+                                          <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold border border-indigo-100">
+                                             <Pill className="w-3 h-3" /> {rx.medicines?.length || 0} items
+                                          </span>
+                                       </td>
+                                       {/* 🟢 THE VIEW BUTTON */}
+                                       <td className="px-6 py-4 text-right">
+                                            <button 
+                                                onClick={() => setSelectedPrescription(rx)}
+                                                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100">
+                                                <Eye className="w-3 h-3" /> View Rx
+                                            </button>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {prescriptions.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-400">No prescriptions issued yet.</td></tr>}
+                              </tbody>
+                           </table>
+                        </div>
+                     </div>
+                  )}
+
+                  {/* ... (Keep your existing Logs, Users, Doctors, Orders, Appointments, Lab_Schedule blocks exactly as they were here) ... */}
+                  
+                  {activeTab === 'users' && (
                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="p-5 border-b border-slate-100 bg-slate-50/50">
                            <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users className="w-4 h-4 text-[#5747e6]" /> Global Users Status</h3>
@@ -196,43 +292,7 @@ const SuperAdminDashboard = () => {
                      </div>
                   )}
 
-                  {activeTab === 'prescriptions' && ( /* ... Prescriptions View ... */
-                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText className="w-4 h-4 text-[#5747e6]" /> E-Prescription Audit Log</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                           <table className="w-full text-left">
-                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
-                                 <tr>
-                                    <th className="px-6 py-4">Date Issued</th><th className="px-6 py-4">Doctor</th><th className="px-6 py-4">Patient</th><th className="px-6 py-4">Diagnosis</th><th className="px-6 py-4">Drugs</th><th className="px-6 py-4 text-right">Verification</th>
-                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100 text-sm">
-                                 {prescriptions.map(rx => (
-                                    <tr key={rx._id} className="hover:bg-slate-50">
-                                       <td className="px-6 py-4 text-slate-500 text-xs font-mono">{new Date(rx.createdAt).toLocaleDateString()}</td>
-                                       <td className="px-6 py-4 font-bold text-[#5747e6]">Dr. {rx.doctorId?.name || "Unknown"}</td>
-                                       <td className="px-6 py-4 font-bold text-slate-700">{rx.patientId?.fullName || "Unknown"}</td>
-                                       <td className="px-6 py-4 text-slate-600 max-w-[200px] truncate">{rx.diagnosis || "General"}</td>
-                                       <td className="px-6 py-4">
-                                          <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold border border-indigo-100">
-                                             <Pill className="w-3 h-3" /> {rx.medicines?.length || 0} items
-                                          </span>
-                                       </td>
-                                       <td className="px-6 py-4 text-right">
-                                          <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">{rx._id.slice(-6).toUpperCase()}</span>
-                                       </td>
-                                    </tr>
-                                 ))}
-                                 {prescriptions.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400">No prescriptions issued yet.</td></tr>}
-                              </tbody>
-                           </table>
-                        </div>
-                     </div>
-                  )}
-
-                  {activeTab === 'logs' && ( /* ... Logs View ... */
+                  {activeTab === 'logs' && (
                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                            <h3 className="font-bold text-slate-800 flex items-center gap-2"><Eye className="w-4 h-4 text-[#5747e6]" /> The Spy Log</h3>
@@ -259,7 +319,7 @@ const SuperAdminDashboard = () => {
                      </div>
                   )}
 
-                  {activeTab === 'doctors' && ( /* ... Doctors View ... */
+                  {activeTab === 'doctors' && (
                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                            <h3 className="font-bold text-slate-800 flex items-center gap-2"><Stethoscope className="w-4 h-4 text-[#5747e6]" /> Manage Doctor Profiles</h3>
@@ -288,138 +348,181 @@ const SuperAdminDashboard = () => {
                      </div>
                   )}
 
-                  {activeTab === 'orders' && ( /* ... Orders View ... */
-                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-[#5747e6]" /> Global Orders Feed</h3>
+                  {activeTab === 'appointments' && (
+                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><Calendar className="w-4 h-4 text-[#5747e6]" /> Master Schedule - All Patient Appointments</h3>
+                           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">{appointments.length} Total</span>
                         </div>
-                        <div className="divide-y divide-slate-100">
-                           {orders.map(order => (
-                              <div key={order._id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-[#5747e6]/10 flex items-center justify-center text-[#5747e6]">
-                                       <ShoppingCart className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                       <p className="text-sm font-bold text-slate-800">Order #{order._id.slice(-6)}</p>
-                                       <p className="text-xs text-slate-500">Customer: {order.user?.fullName || "Patient"}</p>
-                                    </div>
-                                 </div>
-                                 <div className="text-right">
-                                    <p className="text-sm font-bold text-slate-900">₹{order.totalAmount}</p>
-                                    <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase mt-1">Paid</span>
-                                 </div>
-                              </div>
-                           ))}
-                           {orders.length === 0 && <div className="p-8 text-center text-slate-400">No orders placed yet.</div>}
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
+                                 <tr>
+                                    <th className="px-6 py-4">Date & Time</th>
+                                    <th className="px-6 py-4">Patient</th>
+                                    <th className="px-6 py-4">Doctor</th>
+                                    <th className="px-6 py-4">Reason</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-sm">
+                                 {appointments.map(appt => (
+                                    <tr key={appt._id} className="hover:bg-slate-50 transition-colors">
+                                       <td className="px-6 py-4">
+                                          <div className="flex flex-col">
+                                             <span className="font-bold text-slate-700">{new Date(appt.date).toLocaleDateString()}</span>
+                                             <span className="text-xs text-slate-500">{appt.time || appt.timeSlot || "N/A"}</span>
+                                          </div>
+                                       </td>
+                                       <td className="px-6 py-4">
+                                          <div className="flex items-center gap-3">
+                                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                                                {(appt.patientId?.fullName || appt.patientName || "U")[0].toUpperCase()}
+                                             </div>
+                                             <span className="font-bold text-slate-700">{appt.patientId?.fullName || appt.patientName || "Unknown"}</span>
+                                          </div>
+                                       </td>
+                                       <td className="px-6 py-4 font-bold text-[#5747e6]">Dr. {appt.doctorId?.name || appt.doctorId?.userId?.fullName || "Unknown"}</td>
+                                       <td className="px-6 py-4 text-slate-600 max-w-[200px] truncate">{appt.reason || appt.symptoms || "General Consultation"}</td>
+                                       <td className="px-6 py-4 text-center">
+                                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                                             appt.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                             appt.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                             appt.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-100' :
+                                             'bg-amber-50 text-amber-700 border-amber-100'
+                                          }`}>
+                                             {appt.status === 'completed' && <CheckCircle className="w-3 h-3" />}
+                                             {appt.status === 'confirmed' && <Clock className="w-3 h-3" />}
+                                             {appt.status === 'pending' && <Clock className="w-3 h-3" />}
+                                             {appt.status || 'pending'}
+                                          </span>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {appointments.length === 0 && (
+                                    <tr><td colSpan="5" className="p-12 text-center text-slate-400 bg-slate-50/50">No appointments scheduled yet.</td></tr>
+                                 )}
+                              </tbody>
+                           </table>
                         </div>
                      </div>
                   )}
 
-                  {activeTab === 'appointments' && ( /* ... Appointments View ... */
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {appointments.map(appt => (
-                           <div key={appt._id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
-                              <div className="flex justify-between items-start mb-4">
-                                 <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wide">
-                                    <Clock className="w-3 h-3" /> {appt.date} • {appt.timeSlot}
-                                 </div>
-                                 <div className={`w-2 h-2 rounded-full ${appt.status === 'confirmed' || appt.status === 'completed' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                              </div>
-                              <div className="space-y-3">
-                                 <div>
-                                    <p className="text-xs text-slate-400 font-bold uppercase">Patient</p>
-                                    <p className="font-bold text-slate-900">{appt.patientId?.fullName || "Unknown"}</p>
-                                 </div>
-                                 <div>
-                                    <p className="text-xs text-slate-400 font-bold uppercase">Doctor</p>
-                                    <p className="font-bold text-[#5747e6]">{appt.doctorId?.name || "Unknown Dr"}</p>
-                                 </div>
-                                 <div className="pt-3 border-t border-slate-50 mt-3">
-                                    <p className="text-xs text-slate-500 italic">"{appt.reason}"</p>
-                                 </div>
-                              </div>
-                           </div>
-                        ))}
-                        {appointments.length === 0 && <div className="col-span-full p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">No appointments scheduled yet.</div>}
+                  {activeTab === 'orders' && (
+                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-[#5747e6]" /> Global Orders</h3>
+                           <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">₹{totalRevenue} Total Revenue</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
+                                 <tr>
+                                    <th className="px-6 py-4">Order ID</th>
+                                    <th className="px-6 py-4">Customer</th>
+                                    <th className="px-6 py-4">Items</th>
+                                    <th className="px-6 py-4">Amount</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-sm">
+                                 {orders.map(order => (
+                                    <tr key={order._id} className="hover:bg-slate-50 transition-colors">
+                                       <td className="px-6 py-4 font-mono text-xs text-slate-500">#{order._id?.slice(-8).toUpperCase()}</td>
+                                       <td className="px-6 py-4 font-bold text-slate-700">{order.userId?.fullName || order.customerName || "Unknown"}</td>
+                                       <td className="px-6 py-4">
+                                          <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold border border-indigo-100">
+                                             <Pill className="w-3 h-3" /> {order.items?.length || 0} items
+                                          </span>
+                                       </td>
+                                       <td className="px-6 py-4 font-bold text-emerald-600">₹{order.totalAmount || 0}</td>
+                                       <td className="px-6 py-4 text-center">
+                                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                                             order.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                             order.status === 'shipped' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                             order.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-100' :
+                                             'bg-amber-50 text-amber-700 border-amber-100'
+                                          }`}>
+                                             {order.status || 'pending'}
+                                          </span>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {orders.length === 0 && (
+                                    <tr><td colSpan="5" className="p-12 text-center text-slate-400 bg-slate-50/50">No orders placed yet.</td></tr>
+                                 )}
+                              </tbody>
+                           </table>
+                        </div>
                      </div>
                   )}
 
-                  {/* 🟢 NEW VIEW: LAB SCHEDULE (Tailored to your Schema) */}
                   {activeTab === 'lab_schedule' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="col-span-full mb-2 flex items-center justify-between">
-                           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                              <FlaskConical className="w-5 h-5 text-[#5747e6]" /> Diagnostic Lab Schedule
-                           </h3>
-                           <span className="text-xs font-bold bg-[#5747e6]/10 text-[#5747e6] px-3 py-1 rounded-full border border-[#5747e6]/20">
-                              {labAppointments.length} Total Bookings
-                           </span>
+                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2"><FlaskConical className="w-4 h-4 text-[#5747e6]" /> Lab Appointments Schedule</h3>
+                           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">{labAppointments.length} Total</span>
                         </div>
-
-                        {labAppointments.map(lab => {
-                           // Dynamic styling based on the reportStatus field you created!
-                           const isReportReady = lab.reportStatus === 'Generated' || lab.reportStatus === 'Completed';
-
-                           return (
-                              <div key={lab._id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col h-full">
-                                 {/* Decorative side accent */}
-                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-500"></div>
-
-                                 <div className="flex justify-between items-start mb-4 pl-2">
-                                    <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wide">
-                                       <Clock className="w-3 h-3" /> {lab.date || "TBA"} • {lab.timeSlot || "TBA"}
-                                    </div>
-                                    <div className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${lab.status === 'completed' || lab.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                       {lab.status || "Pending"}
-                                    </div>
-                                 </div>
-
-                                 <div className="space-y-4 pl-2 flex-grow">
-                                    <div>
-                                       <p className="text-xs text-slate-400 font-bold uppercase">Patient</p>
-                                       <p className="font-bold text-slate-900">{lab.patientId?.fullName || "Unknown Patient"}</p>
-                                    </div>
-                                    <div>
-                                       <p className="text-xs text-slate-400 font-bold uppercase">Test Required</p>
-                                       <p className="font-bold text-[#5747e6] flex items-center gap-1.5 mt-0.5">
-                                          <Activity className="w-4 h-4" />
-                                          {/* Displays the Test Name if populated, else shows the ID/Default */}
-                                          {lab.labTestId?.name || lab.labTestId || "Diagnostic Test"}
-                                       </p>
-                                    </div>
-                                 </div>
-
-                                 {/* 🟢 Report Status Footer matching your schema */}
-                                 <div className="mt-4 pt-3 border-t border-slate-50 pl-2 flex items-center justify-between">
-                                    <span className="text-xs text-slate-500 font-bold uppercase">Report Status:</span>
-                                    <span className={`text-xs font-bold flex items-center gap-1 ${isReportReady ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                       {isReportReady ? <CheckCircle className="w-3 h-3" /> : <Loader2 className="w-3 h-3 animate-spin" />}
-                                       {lab.reportStatus || "Pending Analysis"}
-                                    </span>
-                                 </div>
-                              </div>
-                           )
-                        })}
-
-                        {labAppointments.length === 0 && (
-                           <div className="col-span-full p-12 flex flex-col items-center justify-center text-center text-slate-400 bg-white rounded-xl border border-slate-200 border-dashed">
-                              <FlaskConical className="w-12 h-12 mb-3 text-slate-300" />
-                              <p className="font-medium text-slate-500">No lab tests scheduled.</p>
-                              <p className="text-sm mt-1">When patients book diagnostics, they will appear here.</p>
-                           </div>
-                        )}
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-200">
+                                 <tr>
+                                    <th className="px-6 py-4">Date</th>
+                                    <th className="px-6 py-4">Patient</th>
+                                    <th className="px-6 py-4">Test Name</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-sm">
+                                 {labAppointments.map(lab => (
+                                    <tr key={lab._id} className="hover:bg-slate-50 transition-colors">
+                                       <td className="px-6 py-4 font-mono text-xs text-slate-500">{new Date(lab.date || lab.createdAt).toLocaleDateString()}</td>
+                                       <td className="px-6 py-4 font-bold text-slate-700">{lab.patientId?.fullName || lab.patientName || "Unknown"}</td>
+                                       <td className="px-6 py-4">
+                                          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-100">
+                                             <FlaskConical className="w-3 h-3" /> {lab.testName || lab.testId?.name || "Lab Test"}
+                                          </span>
+                                       </td>
+                                       <td className="px-6 py-4 text-center">
+                                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                                             lab.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                             lab.status === 'in-progress' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                             'bg-amber-50 text-amber-700 border-amber-100'
+                                          }`}>
+                                             {lab.status || 'scheduled'}
+                                          </span>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {labAppointments.length === 0 && (
+                                    <tr><td colSpan="4" className="p-12 text-center text-slate-400 bg-slate-50/50">No lab appointments scheduled yet.</td></tr>
+                                 )}
+                              </tbody>
+                           </table>
+                        </div>
                      </div>
                   )}
 
                </div>
             </div>
+
+            {/* 🟢 RENDER MODALS AT THE ROOT OF MAIN CONTENT */}
+            <PrescriptionViewer 
+               isOpen={!!selectedPrescription} 
+               prescription={selectedPrescription} 
+               onClose={() => setSelectedPrescription(null)} 
+            />
+            <ClinicalReportViewer 
+               isOpen={!!selectedReport} 
+               report={selectedReport} 
+               onClose={() => setSelectedReport(null)} 
+            />
+
          </main>
       </div>
    );
 };
 
-// --- SUB COMPONENTS ---
 const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm ${active ? 'bg-[#5747e6]/10 text-[#5747e6] font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
       <Icon className={`w-5 h-5 ${active ? 'text-[#5747e6]' : 'text-slate-400'}`} />{label}

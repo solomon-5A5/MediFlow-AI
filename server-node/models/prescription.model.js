@@ -42,11 +42,10 @@ const prescriptionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to generate a security hash
-prescriptionSchema.pre('save', function (next) {
+prescriptionSchema.pre('save', async function () {
     if (!this.verification.signatureHash) {
         this.verification.signatureHash = Buffer.from(`${this._id}-${this.doctorId}-${Date.now()}`).toString('base64');
     }
-    next();
 });
 
 module.exports = mongoose.model("Prescription", prescriptionSchema);

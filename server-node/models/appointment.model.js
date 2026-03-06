@@ -12,7 +12,7 @@ const appointmentSchema = new mongoose.Schema({
 
   timeSlot: { type: String, required: true },
   status: { type: String, default: "pending" },
-  meetingLink: { type: String, default: "" },
+  meetLink: { type: String, default: "" },
   reason: { type: String, default: "General Checkup" },
   attachedReportUrl: { type: String, default: null },
   attachedReportName: { type: String, default: null }
