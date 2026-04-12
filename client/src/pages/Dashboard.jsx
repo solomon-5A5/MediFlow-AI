@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Calendar, Video, Download, Heart, Activity, Scale,
-  LogOut, History as HistoryIcon, Search, Bell, Clock, AlertTriangle, Pill, FileText, CheckCircle // Added FileText, CheckCircle
+  LogOut, History as HistoryIcon, Search, Bell, Clock, AlertTriangle, Pill, FileText, CheckCircle, BrainCircuit // Added FileText, CheckCircle, BrainCircuit
 } from 'lucide-react';
 import DoctorList from '../components/DoctorList'; // 👈 Our shiny new component
 import PrescriptionViewer from '../components/PrescriptionViewer';
@@ -126,6 +126,10 @@ const Dashboard = () => {
             <Activity className="w-5 h-5" />
             <span className="font-medium">Smart Diagnostics</span>
           </a>
+          <a href="/ai-assistant" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+            <BrainCircuit className="w-5 h-5" />
+            <span className="font-medium">AI Co-Pilot</span>
+          </a>
           <a href="/pharmacy" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
             <Pill className="w-5 h-5" />
             <span className="font-medium">Pharmacy</span>
@@ -175,7 +179,7 @@ const Dashboard = () => {
           <section className="flex flex-col gap-6">
             <header className="flex flex-wrap justify-between items-end gap-4">
               <div className="flex flex-col gap-1">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight font-display">Good morning, {user?.fullName?.split(' ')[0]}</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight font-display">Hello, {user?.fullName?.split(' ')[0]}</h2>
                 <p className="text-slate-500 text-lg">Here is your health summary.</p>
               </div>
               <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm">
@@ -186,15 +190,15 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2 text-rose-500"><Heart className="w-5 h-5" /><span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Heart Rate</span></div>
-                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">72</span><span className="text-sm text-slate-500 mb-1 font-medium">bpm</span></div>
+                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">--</span><span className="text-sm text-slate-500 mb-1 font-medium">bpm</span></div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2 text-blue-500"><Activity className="w-5 h-5" /><span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Blood Pressure</span></div>
-                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">120/80</span><span className="text-sm text-slate-500 mb-1 font-medium">mmHg</span></div>
+                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">--/--</span><span className="text-sm text-slate-500 mb-1 font-medium">mmHg</span></div>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2 text-indigo-500"><Scale className="w-5 h-5" /><span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Weight</span></div>
-                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">68</span><span className="text-sm text-slate-500 mb-1 font-medium">kg</span></div>
+                <div className="flex items-end gap-2"><span className="text-4xl font-bold font-display text-slate-800">--</span><span className="text-sm text-slate-500 mb-1 font-medium">kg</span></div>
               </div>
             </div>
           </section>

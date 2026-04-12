@@ -6,25 +6,27 @@ import {
     LayoutDashboard, Calendar, FlaskConical, Folder,
     MessageSquare, Settings, Bell, Search, Activity,
     Clock, Users, Video, XCircle, FileText, Eye, CheckCircle, PenTool,
-    Scan, User, Download, ActivitySquare // 🟢 ADDED NEW ICONS
+    Scan, User, Download, ActivitySquare
 } from 'lucide-react';
 import PrescriptionModal from '../components/PrescriptionModal';
 import XRayScanner from './XRayScanner';
 import LabTests from './LabTests';
-import ClinicalReportBuilder from '../components/ClinicalReportBuilder'; // 🟢 ADD THIS
-import VideoConsultation from '../components/VideoConsultation'; // 🟢 ADD IMPORT
+import ClinicalReportBuilder from '../components/ClinicalReportBuilder'; 
+import VideoConsultation from '../components/VideoConsultation'; 
+import MedicalChatbot from '../components/MedicalChatbot'; 
 
 const DoctorDashboard = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
     // --- STATE ---
+    const [currentAiResult, setCurrentAiResult] = useState(null); // 🟢 NEW: Global AI State
     const [activeTab, setActiveTab] = useState('schedule');
-    const [activePatient, setActivePatient] = useState(null); // 🟢 STATE FOR PATIENT CONTEXT
+    const [activePatient, setActivePatient] = useState(null); 
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedAppointmentForRx, setSelectedAppointmentForRx] = useState(null);
-    const [activeCallLink, setActiveCallLink] = useState(null); // 🟢 ADD STATE
+    const [activeCallLink, setActiveCallLink] = useState(null); 
 
     // 🛡️ SECURITY BOUNCER
     useEffect(() => {
@@ -134,16 +136,16 @@ const DoctorDashboard = () => {
                     <div className="max-w-7xl mx-auto pb-12">
 
                         {/* PAGE HEADER (Hidden if on profile page to save space) */}
-                        {activeTab !== 'profile' && (
+                        {activeTab !== 'profile' && activeTab !== 'xray' && (
                             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-[#5747e6]/10 text-[#5747e6] px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
-                                            {activeTab === 'research' ? 'Lab Analysis Mode' : activeTab === 'xray' ? 'PyTorch Vision Core' : 'Dashboard'}
+                                            {activeTab === 'research' ? 'Lab Analysis Mode' : 'Dashboard'}
                                         </span>
                                     </div>
                                     <h1 className="text-3xl md:text-4xl font-bold text-[#100e1b] tracking-tight">
-                                        {activeTab === 'research' ? 'Smart Lab Reports' : activeTab === 'xray' ? 'Vision AI Diagnostics' : 'My Schedule & Queue'}
+                                        {activeTab === 'research' ? 'Smart Lab Reports' : 'My Schedule & Queue'}
                                     </h1>
                                 </div>
                             </div>
@@ -153,7 +155,7 @@ const DoctorDashboard = () => {
                         {activeTab === 'profile' && activePatient ? (
                             <PatientProfileView
                                 patient={activePatient}
-                                appointments={appointments} // 🟢 1. Pass appointments here
+                                appointments={appointments}
                                 onBack={() => {
                                     setActiveTab('schedule');
                                     setActivePatient(null);
@@ -162,19 +164,18 @@ const DoctorDashboard = () => {
                                     setActivePatient(patientData);
                                     setActiveTab('xray');
                                 }}
-                                onWriteReport={(patientData) => { // 🟢 ROUTE TO REPORT
+                                onWriteReport={(patientData) => {
                                     setActivePatient(patientData);
                                     setActiveTab('report');
                                 }}
                             />
-                        ) : activeTab === 'report' && activePatient ? ( // 🟢 RENDER REPORT BUILDER
+                        ) : activeTab === 'report' && activePatient ? (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <ClinicalReportBuilder
                                     patient={activePatient}
                                     onBack={() => setActiveTab('profile')}
                                     onSave={(payload) => {
                                         console.log("Saving to DB...", payload);
-                                        // In the future, this makes a POST request to save the RAG payload
                                         setActiveTab('profile');
                                     }}
                                 />
@@ -183,15 +184,24 @@ const DoctorDashboard = () => {
                             <LabResearchView
                                 appointments={appointments}
                                 onViewReport={trackFileAccess}
-                                onRunAI={() => setActiveTab('lab-ai')} // 🟢 Tab Switcher
+                                onRunAI={() => setActiveTab('lab-ai')}
                             />
-                        ) : activeTab === 'lab-ai' ? ( // 🟢 RENDER THE LAB COMPONENT
+                        ) : activeTab === 'lab-ai' ? (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <LabTests />
                             </div>
                         ) : activeTab === 'xray' ? (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <XRayScanner patient={activePatient} />
+                                {/* 🟢 NEW: CONTEXTUAL BACK BUTTON FOR XRAY TAB */}
+                                {activePatient && (
+                                    <button 
+                                        onClick={() => setActiveTab('profile')} 
+                                        className="flex items-center gap-2 text-[#575095] hover:text-[#5747e6] font-bold mb-6 transition-colors"
+                                    >
+                                        ← Back to {activePatient.fullName || activePatient.name}'s Profile
+                                    </button>
+                                )}
+                                <XRayScanner patient={activePatient} setGlobalAiResult={setCurrentAiResult} />
                             </div>
                         ) : (
                             <ScheduleView
@@ -225,6 +235,10 @@ const DoctorDashboard = () => {
                     onEndCall={() => setActiveCallLink(null)}
                 />
             )}
+
+            {/* 🟢 THE NEW FLOATING AI CHATBOT */}
+            <MedicalChatbot patient={activePatient} aiResult={currentAiResult} /> 
+
         </div>
     );
 };
@@ -242,24 +256,8 @@ const SidebarItem = ({ icon: Icon, label, active, isSpecial, onClick }) => (
     </button>
 );
 
-// --- 📅 SCHEDULE VIEW (With View Profile Button) ---
+// --- 📅 SCHEDULE VIEW ---
 const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile }) => {
-    const handleStatusChange = async (id, status) => {
-        const toastId = toast.loading("Updating...");
-        try {
-            const url = `http://localhost:5001/api/appointments/cancel/${id}`;
-            const res = await fetch(url, { method: "PUT" });
-            if (res.ok) {
-                toast.success(`Appointment Cancelled`, { id: toastId });
-                refresh();
-            } else {
-                toast.error("Failed to update", { id: toastId });
-            }
-        } catch (error) {
-            toast.error("Server error", { id: toastId });
-        }
-    };
-
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -281,7 +279,6 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
                         appointments.map(appt => {
                             const isCancelled = appt.status === 'cancelled';
                             const isCompleted = appt.status === 'completed';
-                            // Extract patient data safely
                             const patientData = appt.patientId || { _id: appt._id, fullName: "Unknown Patient" };
 
                             return (
@@ -307,7 +304,6 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
 
                                     {!isCancelled && !isCompleted && (
                                         <div className="flex flex-wrap items-center gap-3">
-                                            {/* 🟢 VIEW PROFILE BUTTON INJECTED HERE */}
                                             <button
                                                 onClick={() => onViewProfile(patientData)}
                                                 className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-[#5747e6] rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all"
@@ -315,7 +311,6 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
                                                 <User className="w-4 h-4" /> View Profile
                                             </button>
 
-                                            {/* 🟢 DOCTOR VIDEO BUTTON */}
                                             <button
                                                 onClick={() => setActiveCallLink(appt.meetLink)}
                                                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-[#100e1b] rounded-lg font-bold text-sm hover:border-[#5747e6] hover:text-[#5747e6] transition-all"
@@ -334,7 +329,6 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
 
                                     {isCompleted && (
                                         <div className="flex items-center gap-3">
-                                            {/* View Profile Button on completed appts too! */}
                                             <button
                                                 onClick={() => onViewProfile(patientData)}
                                                 className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-[#5747e6] rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all"
@@ -359,7 +353,6 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
 // --- 👤 PATIENT PROFILE VIEW ---
 const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWriteReport }) => {
 
-    // 🟢 DYNAMICALLY GET REAL LABS FOR THIS PATIENT
     const pastLabs = appointments.filter(appt =>
         (appt.patientId?._id === patient._id || appt.patientId === patient._id) &&
         appt.attachedReportUrl
@@ -371,7 +364,7 @@ const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWrit
                 ← Back to Schedule
             </button>
 
-            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex items-center justify-between mb-8">
+            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
                 <div className="flex items-center gap-6">
                     <div className="w-20 h-20 bg-[#5747e6]/10 text-[#5747e6] rounded-2xl flex items-center justify-center text-3xl font-bold font-display">
                         {patient?.fullName?.charAt(0) || patient?.name?.charAt(0) || "P"}
@@ -381,7 +374,6 @@ const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWrit
                         <p className="text-sm text-[#575095] font-medium mt-1">Patient ID: {patient?._id || "N/A"} • Profile Access Verified</p>
                     </div>
                 </div>
-                {/* 🟢 NEW ACTION BUTTONS */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => onWriteReport(patient)}
@@ -410,7 +402,6 @@ const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWrit
                                     <p className="font-bold text-sm text-[#100e1b]">{lab.attachedReportName || "Lab Report PDF"}</p>
                                     <p className="text-xs text-[#575095] mt-1">{lab.date}</p>
                                 </div>
-                                {/* 🟢 REAL DOWNLOAD/VIEW BUTTON */}
                                 <button
                                     onClick={() => window.open(lab.attachedReportUrl, "_blank")}
                                     className="p-2 bg-white border border-gray-200 rounded-lg text-[#575095] group-hover:text-[#5747e6] group-hover:border-[#5747e6] transition-all shadow-sm">
@@ -438,11 +429,8 @@ const PatientProfileView = ({ patient, appointments, onBack, onStartXRay, onWrit
     );
 };
 
-// --- 🧪 LAB RESEARCH VIEW (Master List of all uploaded PDFs) ---
-// --- 🧪 LAB RESEARCH VIEW (Master List of all uploaded PDFs) ---
-const LabResearchView = ({ appointments, onViewReport, onRunAI }) => { // 🟢 Add onRunAI
-
-    // 🟢 Filter ALL appointments to find the ones with attached reports
+// --- 🧪 LAB RESEARCH VIEW ---
+const LabResearchView = ({ appointments, onViewReport, onRunAI }) => { 
     const reports = appointments.filter(appt => appt.attachedReportUrl);
 
     return (
@@ -477,7 +465,6 @@ const LabResearchView = ({ appointments, onViewReport, onRunAI }) => { // 🟢 A
                                 Pending AI Analysis
                             </span>
 
-                            {/* 🟢 VIEW ORIGINAL PDF BUTTON */}
                             <button
                                 onClick={() => {
                                     window.open(report.attachedReportUrl, "_blank");
@@ -488,7 +475,6 @@ const LabResearchView = ({ appointments, onViewReport, onRunAI }) => { // 🟢 A
                                 <Eye className="w-4 h-4" /> View PDF
                             </button>
 
-                            {/* 🟢 THE LAB ANALYZER BUTTON */}
                             <button
                                 onClick={onRunAI}
                                 className="flex items-center gap-2 px-4 py-2 bg-[#5747e6] text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">

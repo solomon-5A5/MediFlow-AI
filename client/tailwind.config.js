@@ -10,8 +10,23 @@ export default {
       fontFamily: {
         // Added for the new design
         display: ["Inter", "sans-serif"],
+        "headline": ["Space Grotesk", "sans-serif"],
+        "body": ["Inter", "sans-serif"],
       },
       colors: {
+        "surface-bright": "#f9f9fb",
+        "on-secondary": "#ffffff",
+        "on-primary": "#ffffff",
+        "inverse-on-surface": "#f0f0f2",
+        "primary-container": "#5747e6",
+        "on-surface": "#1a1c1d",
+        "surface-variant": "#e2e2e4",
+        "on-surface-variant": "#474555",
+        "tertiary": "#00563a",
+        "error": "#ba1a1a",
+        "surface-container-high": "#e8e8ea",
+        "tertiary-container": "#00714d",
+        "on-tertiary-container": "#6bf8bb",
         // --- Added for Stitch Design ---
         "background-light": "#f8fafc", /* slate-50 */
         "background-dark": "#0f172a", /* slate-900 */

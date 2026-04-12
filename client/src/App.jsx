@@ -15,6 +15,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import ProductDetails from './pages/ProductDetails';
 import LabTests from './pages/LabTests';
 import XRayScanner from './pages/XRayScanner';
+import PatientChatPortal from './pages/PatientChatPortal'; // 🟢 NEW: AI Chat Portal
 
 // Context & Protection
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -69,6 +70,15 @@ function App() {
 
           {/* 🩻 Vision AI Scanner */}
           <Route path="/xray" element={<XRayScanner />} />
+
+          {/* 🤖 AI Co-Pilot */}
+          <Route path="/ai-assistant" element={
+            <ProtectedRoute>
+              <div className="h-screen bg-[#f6f6f8] p-6">
+                 <PatientChatPortal />
+              </div>
+            </ProtectedRoute>
+          } />
 
           {/* Cart */}
           <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />

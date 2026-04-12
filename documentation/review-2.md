@@ -202,7 +202,49 @@ This section reviews foundational research papers that underpin the core technol
 
 ---
 
-### 4.6 Literature Summary Table
+### 4.6 Paper 9: CheXagent — Towards a Foundation Model for Chest X-Ray Interpretation
+
+**Authors:** Chen, Z., Varma, M., Delbrouck, J.B., et al.
+**Published:** 2024, arXiv:2401.12208 (Stanford University & MILA)
+**Venue:** arXiv (Under review at top-tier venues)
+
+**Summary:** CheXagent presents a highly capable clinical vision-language foundation model designed specifically for chest X-ray interpretation. The architecture combines a specialized clinical vision encoder (trained on a vast corpus of CXRs) with a robust large language model. It significantly outperforms previous state-of-the-art models in interpreting radiological findings, generating accurate automated reports, and acting as a conversational agent for medical professionals asking questions about a given image. 
+
+**Relevance to MediFlow AI:** This paper validates the core premise of integrating AI heavily into clinical respiratory workflows and underscores the rapid mainstream acceptance of foundation models for tasks exactly like MediFlow's. While MediFlow AI utilizes a simpler, more computationally accessible DenseNet-121 model over a foundational LLM-vision approach for primary triage, CheXagent affirms the utility and necessity of multimodal AI systems capable of deep chest X-ray reasoning.
+
+**Critical Analysis:** CheXagent focuses on augmenting radiologist workflows, primarily aiming at experts. In contrast, MediFlow AI abstracts these insights down to a dual-audience model—triaging alerts for physicians while using its Graph-RAG layer to explain simplified concepts securely to patients. CheXagent's high inference cost also makes MediFlow's modular approach more suitable for lightweight telemedicine deployments.
+
+---
+
+### 4.7 Paper 10: From Local to Global — A Graph RAG Approach to Query-Focused Summarization
+
+**Authors:** Edge, D., Trinh, H., Cheng, X., Bradley, J., Chao, A., Mody, A., Truitt, S., and Larson, J.
+**Published:** 2024, arXiv:2404.16130 (Microsoft Research)
+**Venue:** arXiv / Microsoft Research Publications
+
+**Summary:** This seminal paper from Microsoft Research formalizes the "GraphRAG" paradigm. It addresses the failure of standard pseudo-document RAG approaches when faced with global, query-focused summarization tasks that require connecting wide-ranging concepts. The proposed pipeline leverages LLMs to first extract a knowledge graph from raw text, build hierarchical community structures, and then summarize these graphs to provide dense, interconnected, and highly accurate retrieval contexts—improving comprehensiveness and factual grounding compared to naive semantic search.
+
+**Relevance to MediFlow AI:** Provides the theoretical framework and official validation for MediFlow AI's Hybrid Graph-RAG architecture. Like the Microsoft system, MediFlow's platform captures interconnected states (e.g., patient nodes linked to lab results, prescriptions, and physician notes in Neo4j) to inform generation safely. GraphRAG's ability to reduce hallucinations and connect "multi-hop" query logic maps perfectly to patient queries requiring combined historic and active clinical state evaluation.
+
+**Critical Analysis:** Microsoft's formulation extracts graphs entirely from unstructured text on the fly. MediFlow AI optimizes this for healthcare structurally: it builds a deterministic medical entity graph via its backend database interactions natively, augmenting it with purely unstructured data. This specialized implementation reduces processing overhead while inheriting the exact accuracy benefits described in Edge et al.
+
+---
+
+### 4.8 Paper 11: Towards Conversational Diagnostic AI (AMIE)
+
+**Authors:** Tu, T., Palepu, A., Schaekermann, M., et al.
+**Published:** 2024, arXiv:2401.05654 (Google Research)
+**Venue:** arXiv / Nature Research (pending)
+
+**Summary:** AMIE (Articulate Medical Intelligence Explorer) represents Google's foray into deep conversational diagnostic agents. Evaluated against primary care physicians in simulated patient dialogues, AMIE demonstrated near-expert levels in history-taking, diagnostic accuracy, and empathetic communication. The system relies heavily on iterative context-gathering and a tailored inner-loop reasoning framework to maintain safety, clarity, and factual alignment with established healthcare guidelines.
+
+**Relevance to MediFlow AI:** AMIE highlights the immense value of safely deploying conversational AI layers interfacing directly with patients. MediFlow AI's post-consultation query layer echoes AMIE's focus on empathetic, structured communication. However, while AMIE targets active diagnostics, MediFlow strictly limits its agent's capabilities to post-consultation explainer and triage—respecting existing doctor authority without risking diagnostic hallucinations.
+
+**Critical Analysis:** AMIE requires extraordinary computing scale to operate interactively and assumes the AI takes the role of the primary diagnostic entity. MediFlow's workflow correctly identifies that AI is currently best used to augment the existing doctor-patient relationship rather than replace it, utilizing its specialized LLM layer as a patient educator rather than a primary diagnostic practitioner.
+
+---
+
+### 4.9 Literature Summary Table
 
 | # | Paper | Year | Key Contribution | Relevance to MediFlow AI |
 |---|-------|------|-----------------|--------------------------|
@@ -214,6 +256,9 @@ This section reviews foundational research papers that underpin the core technol
 | 6 | DenseNet-121 for CXR (Usman et al.) | 2024 | DenseNet-121 multi-label evaluation with weighted loss | Validates our architecture choice and training strategy |
 | 7 | AI in Telemedicine (Rossi & Rehman) | 2025 | Review of AI integration in telemedicine platforms | Contextualizes MediFlow AI in AI-telemedicine landscape |
 | 8 | Multi-Label Lung Disease DL (Irtaza et al.) | 2024 | DenseNet vs. EfficientNet ensemble for CXR classification | Informs triage thresholds and future ensemble approach |
+| 9 | CheXagent (Chen et al.) | 2024 | Multimodal foundation model for chest X-ray interpretation | Contextualizes the shift toward capable multimodal clinical AI tools |
+| 10 | GraphRAG (Edge et al.) | 2024 | Formalizes LLM-driven knowledge graph construction & RAG | Vindicates MediFlow's Hybrid Graph-RAG patient-query architecture |
+| 11 | AMIE (Tu et al.) | 2024 | Conversational agent for rigorous medical diagnostic dialogues | Validates patient-facing LLMs using continuous inner-loop reasoning |
 
 ---
 

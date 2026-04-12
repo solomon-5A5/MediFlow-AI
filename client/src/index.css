@@ -1,6 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.glass-morphism {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.prism-edge {
+    position: relative;
+}
+
+.prism-edge::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(45deg, transparent, rgba(62, 39, 206, 0.2), rgba(0, 86, 58, 0.2), transparent);
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.user-bubble {
+    border-bottom-right-radius: 4px;
+}
+
+.ai-bubble {
+    border-bottom-left-radius: 4px;
+}
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
 
 @layer base {
   html {

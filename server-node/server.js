@@ -67,6 +67,7 @@ app.use("/api/users", require("./routes/user.route"));
 app.use("/api/prescriptions", require("./routes/prescription.route")); // 🟢 Prescriptions Route
 app.use("/api/vision", imageRoutes);
 app.use("/api/reports", require("./routes/report.route")); // 🟢 Clinical Reports Route
+app.use('/api/chats', require('./routes/chat.route'));
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
