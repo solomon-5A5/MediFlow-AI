@@ -61,16 +61,17 @@ const saveReport = async (req, res) => {
         } = req.body;
 
         const newReport = new ImagingReport({
-            patientId,
-            prediction: primary_flag,
-            confidence: flag_confidence,
-            high_priority_findings,
-            secondary_anomalies,
-            evaluated_negative,
-            risk_score,
-            overall_status,
-            clinical_suggestion,
-            radiologistNotes: notes || "AI-assisted multimodal triage. Awaiting physician validation."
+            patientId: req.body.patientId,
+            prediction: req.body.primary_flag,
+            confidence: req.body.flag_confidence,
+            heatmapImage: req.body.heatmap_image || null,
+            riskScore: req.body.risk_score?.value || req.body.risk_score || 0,
+            high_priority_findings: req.body.high_priority_findings,
+            secondary_anomalies: req.body.secondary_anomalies,
+            evaluated_negative: req.body.evaluated_negative,
+            overall_status: req.body.overall_status,
+            clinical_suggestion: req.body.clinical_suggestion,
+            radiologistNotes: req.body.notes || "AI-assisted multimodal triage. Awaiting physician validation."
         });
 
         await newReport.save();

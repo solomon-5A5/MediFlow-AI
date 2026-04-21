@@ -9,6 +9,17 @@ import {
     Clock, Package, Truck, MapPin
 } from 'lucide-react';
 
+// Helper to dynamically load the Razorpay script
+const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
+};
+
 const CartPage = () => {
     // 🟢 CHANGE 1: Import updateQuantity
     const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
@@ -27,37 +38,98 @@ const CartPage = () => {
     const handlePlaceOrder = async () => {
         if (cart.length === 0) return;
         setIsProcessing(true);
-        const toastId = toast.loading("Processing Payment...");
+        const toastId = toast.loading("Initializing Payment gateway...");
+
+        // 1. Load Razorpay
+        const res = await loadRazorpayScript();
+        if (!res) {
+            toast.error("Payment gateway failed to load. Please check your connection.", { id: toastId });
+            setIsProcessing(false);
+            return;
+        }
 
         try {
-            const res = await fetch("http://localhost:5001/api/orders/create", {
+            // 2. Ask Node.js backend to create a Razorpay Order ID
+            const orderResponse = await fetch("http://localhost:5001/api/payments/create-order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    patientId: user.id || user._id,
-                    items: cart.map(item => ({
-                        medicineId: item._id,
-                        name: item.name,
-                        price: item.price,
-                        quantity: item.quantity
-                    })),
-                    totalAmount: finalTotal
-                })
+                body: JSON.stringify({ amount: finalTotal })
             });
 
-            const data = await res.json();
+            const orderData = await orderResponse.json();
 
-            if (res.ok) {
-                toast.success("Order Placed!", { id: toastId });
-                clearCart();
-                setOrderId(data.order._id || "#ORD-NEW");
-                setOrderPlaced(true);
-            } else {
-                toast.error("Order Failed", { id: toastId });
+            if (!orderData || !orderData.id) {
+                throw new Error("Failed to create order on backend");
             }
+
+            toast.dismiss(toastId); // Clear the loading toast
+
+            // 3. Configure and Open the Razorpay Popup
+            const options = {
+                key: "rzp_test_Scgpbv1xV27qxi", // 👈 Replace with your actual Razorpay Test Key ID
+                amount: orderData.amount,
+                currency: "INR",
+                name: "MediFlow AI Pharmacy",
+                description: "Wellness Essentials Order",
+                order_id: orderData.id,
+                handler: async function (response) {
+                    // 🟢 THIS RUNS ONLY IF PAYMENT IS SUCCESSFUL!
+                    const successToastId = toast.loading("Securing your order...");
+
+                    try {
+                        // Now we save the actual order to your database just like you did before
+                        const dbRes = await fetch("http://localhost:5001/api/orders/create", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                patientId: user.id || user._id,
+                                paymentId: response.razorpay_payment_id, // Save the transaction ID!
+                                items: cart.map(item => ({
+                                    medicineId: item._id,
+                                    name: item.name,
+                                    price: item.price,
+                                    quantity: item.quantity
+                                })),
+                                totalAmount: finalTotal
+                            })
+                        });
+
+                        const dbData = await dbRes.json();
+
+                        if (dbRes.ok) {
+                            toast.success("Payment Successful! Order Placed.", { id: successToastId });
+                            clearCart();
+                            setOrderId(dbData.order?._id || response.razorpay_payment_id);
+                            setOrderPlaced(true); // Triggers your beautiful success screen
+                        } else {
+                            toast.error("Payment succeeded, but order tracking failed.", { id: successToastId });
+                        }
+                    } catch (err) {
+                        toast.error("Error saving order.", { id: successToastId });
+                    }
+                },
+                prefill: {
+                    name: user?.fullName || "Solomon Pattapu", // Uses context if available
+                    email: user?.email || "patient@mediflow.com",
+                    contact: "9999999999",
+                },
+                theme: {
+                    color: "#6354e8", // Matches your exact UI hex code
+                },
+                modal: {
+                    ondismiss: function() {
+                        setIsProcessing(false);
+                        toast.error("Payment cancelled");
+                    }
+                }
+            };
+
+            const paymentObject = new window.Razorpay(options);
+            paymentObject.open();
+
         } catch (err) {
-            toast.error("Server Error", { id: toastId });
-        } finally {
+            console.error(err);
+            toast.error("Failed to initialize payment.", { id: toastId });
             setIsProcessing(false);
         }
     };
@@ -117,7 +189,7 @@ const CartPage = () => {
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6354e8]/10 text-[#6354e8]">
                                 <ShoppingCart className="w-6 h-6" />
                             </div>
-                            <span className="text-xl font-bold tracking-tight text-gray-900 hidden sm:block">Health Hive</span>
+                            <span className="text-xl font-bold tracking-tight text-gray-900 hidden sm:block">MediFlow AI</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-full bg-[#6354e8] text-white flex items-center justify-center font-bold border-2 border-white shadow-sm">
@@ -166,7 +238,7 @@ const CartPage = () => {
                                                 <p className="text-sm text-gray-500 mt-0.5">{item.category}</p>
                                             </div>
                                         </div>
-                                        <p className="text-[#6354e8] font-bold mt-2">${item.price}</p>
+                                        <p className="text-[#6354e8] font-bold mt-2">₹{item.price}</p>
                                     </div>
                                     <div className="flex items-center gap-6 mt-4 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end">
                                         <div className="flex items-center rounded-lg bg-gray-50 border border-gray-200 p-1">
@@ -209,7 +281,7 @@ const CartPage = () => {
                                 <div className="space-y-4 mb-6">
                                     <div className="flex justify-between text-sm text-gray-600">
                                         <span>Subtotal</span>
-                                        <span className="font-medium">${cartTotal.toFixed(2)}</span>
+                                        <span className="font-medium">₹{cartTotal.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600">
                                         <span>Shipping</span>
@@ -217,12 +289,12 @@ const CartPage = () => {
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600">
                                         <span>Tax (8%)</span>
-                                        <span className="font-medium">${tax.toFixed(2)}</span>
+                                        <span className="font-medium">₹{tax.toFixed(2)}</span>
                                     </div>
                                     <div className="my-4 border-t border-gray-200 border-dashed"></div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-base font-bold text-gray-900">Total</span>
-                                        <span className="text-2xl font-black text-[#6354e8]">${finalTotal.toFixed(2)}</span>
+                                        <span className="text-2xl font-black text-[#6354e8]">₹{finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
 

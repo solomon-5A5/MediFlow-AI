@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Chat = require('../models/chat.model');
+const axios = require('axios');
+
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 // 1. Get all chats for a patient (Sidebar list)
 router.get('/patient/:patientId', async (req, res) => {
@@ -32,13 +35,37 @@ router.post('/save', async (req, res) => {
   const { chatId, patientId, title, messages, hasContext, activeFile } = req.body;
   
   try {
+    const needsSmartTitle = !title || title === "New Chat" || title === "Medical Analysis" || title.includes("✅ Successfully");
+    const firstUserMessage = Array.isArray(messages)
+      ? messages.find((msg) => msg.role === 'user')?.content
+      : null;
+
+    let smartTitle = title || "Medical Analysis";
+    if (needsSmartTitle) {
+      if (firstUserMessage) {
+        try {
+          const titleResponse = await axios.post(`${AI_SERVICE_URL}/api/chat-title`, {
+            first_user_message: firstUserMessage
+          });
+          smartTitle = titleResponse.data?.title || smartTitle;
+        } catch (error) {
+          console.error("⚠️ Smart title generation failed:", error.message);
+          smartTitle = firstUserMessage.length > 25
+            ? `${firstUserMessage.substring(0, 25)}...`
+            : firstUserMessage;
+        }
+      } else {
+        smartTitle = "Document Analysis";
+      }
+    }
+
     let chat;
     if (chatId) {
       // Update existing chat
-      chat = await Chat.findByIdAndUpdate(chatId, { messages, hasContext, activeFile }, { new: true });
+      chat = await Chat.findByIdAndUpdate(chatId, { title: smartTitle, messages, hasContext, activeFile }, { new: true });
     } else {
       // Create new chat
-      chat = new Chat({ patientId, title, messages, hasContext, activeFile });
+      chat = new Chat({ patientId, title: smartTitle, messages, hasContext, activeFile });
       await chat.save();
     }
     

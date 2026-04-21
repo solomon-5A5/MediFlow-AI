@@ -20,7 +20,7 @@ SETUP_QUERIES = [
     
     # 3. The Vector Index (For Hybrid RAG)
     """
-    CREATE VECTOR INDEX diagnosis_embeddings IF NOT EXISTS 
+    CREATE VECTOR INDEX mediflow_patients_v2 IF NOT EXISTS 
     FOR (d:DiagnosisEvent) ON (d.embedding) 
     OPTIONS {indexConfig: {
         `vector.dimensions`: 384, 

@@ -100,8 +100,18 @@ const DoctorDashboard = () => {
                     <SidebarItem icon={LayoutDashboard} label="Overview" onClick={() => { setActiveTab('schedule'); setActivePatient(null); }} active={activeTab === 'schedule' || activeTab === 'profile'} />
                     <SidebarItem icon={FlaskConical} label="Smart Lab Analysis" onClick={() => { setActiveTab('research'); setActivePatient(null); }} active={activeTab === 'research'} />
                     <SidebarItem icon={Scan} label="Vision AI (X-Ray)" onClick={() => { setActiveTab('xray'); setActivePatient(null); }} active={activeTab === 'xray'} isSpecial />
-                    <SidebarItem icon={Folder} label="Patient Records" onClick={() => { }} />
-                    <SidebarItem icon={MessageSquare} label="Consultations" onClick={() => { }} />
+                    <SidebarItem 
+                        icon={Folder} 
+                        label="Patient Records" 
+                        onClick={() => { setActiveTab('records'); setActivePatient(null); }} 
+                        active={activeTab === 'records'} 
+                    />
+                    <SidebarItem 
+                        icon={MessageSquare} 
+                        label="Consultations" 
+                        onClick={() => { setActiveTab('consultations'); setActivePatient(null); }} 
+                        active={activeTab === 'consultations'} 
+                    />
                 </nav>
 
                 <div className="mt-auto">
@@ -145,7 +155,10 @@ const DoctorDashboard = () => {
                                         </span>
                                     </div>
                                     <h1 className="text-3xl md:text-4xl font-bold text-[#100e1b] tracking-tight">
-                                        {activeTab === 'research' ? 'Smart Lab Reports' : 'My Schedule & Queue'}
+                                        {activeTab === 'research' ? 'Smart Lab Reports' : 
+                                         activeTab === 'records' ? 'Patient Directory' :
+                                         activeTab === 'consultations' ? 'Consultation History' :
+                                         'My Schedule & Queue'}
                                     </h1>
                                 </div>
                             </div>
@@ -203,6 +216,16 @@ const DoctorDashboard = () => {
                                 )}
                                 <XRayScanner patient={activePatient} setGlobalAiResult={setCurrentAiResult} />
                             </div>
+                        ) : activeTab === 'records' ? (
+                            <PatientRecordsView 
+                                appointments={appointments} 
+                                onViewProfile={(patientData) => {
+                                    setActivePatient(patientData);
+                                    setActiveTab('profile');
+                                }} 
+                            />
+                        ) : activeTab === 'consultations' ? (
+                            <ConsultationsView appointments={appointments} />
                         ) : (
                             <ScheduleView
                                 appointments={appointments}
@@ -312,7 +335,7 @@ const ScheduleView = ({ appointments, loading, refresh, onWriteRx, onViewProfile
                                             </button>
 
                                             <button
-                                                onClick={() => setActiveCallLink(appt.meetLink)}
+                                                onClick={() => setActiveCallLink(appt.meetLink || `https://meet.jit.si/MediFlow_Legacy_${appt._id}`)}
                                                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-[#100e1b] rounded-lg font-bold text-sm hover:border-[#5747e6] hover:text-[#5747e6] transition-all"
                                             >
                                                 <Video className="w-4 h-4" /> Start Call
@@ -499,5 +522,107 @@ const StatCard = ({ icon: Icon, label, value, color, bg }) => (
         </div>
     </div>
 );
+
+// --- 📁 PATIENT RECORDS VIEW ---
+const PatientRecordsView = ({ appointments, onViewProfile }) => {
+    // Extract unique patients from the doctor's appointment history
+    const uniquePatients = [];
+    const seenIds = new Set();
+    
+    appointments.forEach(appt => {
+        const p = appt.patientId;
+        if (p && p._id && !seenIds.has(p._id)) {
+            seenIds.add(p._id);
+            uniquePatients.push(p);
+        }
+    });
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {uniquePatients.length === 0 ? (
+                    <div className="col-span-full p-12 bg-white rounded-2xl border border-dashed border-gray-200 text-center text-[#575095]">
+                        <Folder className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                        <p>No patient records found in your recent history.</p>
+                    </div>
+                ) : (
+                    uniquePatients.map(patient => (
+                        <div key={patient._id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#5747e6]/30 transition-all group">
+                            <div className="flex items-center gap-4 mb-6">
+                                 <div className="w-14 h-14 bg-[#5747e6]/10 text-[#5747e6] rounded-xl flex items-center justify-center text-2xl font-bold font-display group-hover:bg-[#5747e6] group-hover:text-white transition-colors">
+                                    {patient.fullName?.charAt(0) || patient.name?.charAt(0) || "P"}
+                                 </div>
+                                 <div>
+                                     <h3 className="font-bold text-lg text-[#100e1b]">{patient.fullName || patient.name || "Unknown"}</h3>
+                                     <p className="text-xs text-[#575095] font-medium mt-0.5">ID: {patient._id.substring(0, 8).toUpperCase()}</p>
+                                 </div>
+                            </div>
+                            <button 
+                                onClick={() => onViewProfile(patient)} 
+                                className="w-full py-2.5 bg-indigo-50 text-[#5747e6] rounded-xl font-bold text-sm hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                            >
+                                <User className="w-4 h-4" /> Open Full Record
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
+
+// --- 💬 CONSULTATIONS HISTORY VIEW ---
+const ConsultationsView = ({ appointments }) => {
+    // Show only completed or past consultations
+    const pastConsults = appointments.filter(a => a.status === 'completed' || a.status === 'past');
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_-2px_rgba(87,71,230,0.08)] overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                    <h3 className="font-bold text-lg text-[#100e1b] flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-[#5747e6]" /> Consultation Log
+                    </h3>
+                </div>
+                
+                <div className="divide-y divide-gray-50">
+                    {pastConsults.length === 0 ? (
+                        <div className="p-12 text-center text-[#575095]">
+                            <ActivitySquare className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                            <p>No past consultations found in the system.</p>
+                        </div>
+                    ) : (
+                        pastConsults.map(appt => {
+                            const patientName = appt.patientId?.fullName || appt.patientId?.name || "Unknown Patient";
+                            return (
+                                <div key={appt._id} className="p-6 hover:bg-[#f6f6f8] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shrink-0">
+                                            <CheckCircle className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-[#100e1b] text-lg">{patientName}</h4>
+                                            <p className="text-sm text-[#575095] flex items-center gap-2 mt-1">
+                                                <Calendar className="w-3 h-3" /> {appt.date} • {appt.timeSlot || 'Past'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold uppercase tracking-wider">
+                                            Completed
+                                        </span>
+                                        <button className="p-2 bg-white border border-gray-200 text-[#575095] rounded-lg hover:text-[#5747e6] hover:border-[#5747e6] transition-all" title="View Summary">
+                                            <FileText className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default DoctorDashboard;

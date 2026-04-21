@@ -345,6 +345,16 @@ const LabTests = () => {
             {/* HEADER */}
             <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => navigate('/dashboard')} 
+                        className="flex items-center justify-center p-2 mr-2 rounded-xl text-slate-400 hover:text-[#5747e6] hover:bg-[#5747e6]/10 transition-all border border-transparent hover:border-[#5747e6]/20"
+                        title="Back to Dashboard"
+                    >
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                    </button>
                     <div className="w-10 h-10 bg-[#5747e6]/10 rounded-xl flex items-center justify-center text-[#5747e6]">
                         <Microscope className="w-6 h-6" />
                     </div>

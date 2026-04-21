@@ -64,13 +64,19 @@ export default function PatientChatPortal() {
 
   const saveChatToDatabase = async (updatedMessages, contextStatus, fileName) => {
     try {
+      // Find the first message actually typed by the human
+      const firstUserMessage = updatedMessages.find(msg => msg.role === 'user');
+      const chatTitle = firstUserMessage 
+        ? firstUserMessage.content.substring(0, 30) + "..." 
+        : "Medical Analysis";
+
       const res = await fetch("http://localhost:5001/api/chats/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatId: currentChatId,
           patientId: user.id,
-          title: updatedMessages.length > 0 ? updatedMessages[0].content.substring(0, 25) + "..." : "New Chat",
+          title: chatTitle,
           messages: updatedMessages,
           hasContext: contextStatus,
           activeFile: fileName

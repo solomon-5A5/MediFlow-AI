@@ -232,45 +232,45 @@ const Dashboard = () => {
                       <span className="text-[#5747e6] font-black text-3xl font-display">{new Date(appt.date).getDate()}</span>
                     </div>
 
-                    {/* Details */}
-                    <div className="flex-grow flex flex-col justify-center gap-1">
-                      <div className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-1 bg-slate-50 w-fit px-2 py-1 rounded-md">
-                        <Clock className="w-4 h-4" /> {appt.timeSlot} • Video Consultation
+                      {/* Details */}
+                      <div className="flex-grow flex flex-col justify-center gap-1">
+                        <div className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-1 bg-slate-50 w-fit px-2 py-1 rounded-md">
+                          <Clock className="w-4 h-4" /> {appt.timeSlot} • Video Consultation
+                        </div>
+                        <h4 className="text-lg font-bold text-slate-900 font-display">Dr. {appt.doctorId?.userId?.fullName || "Doctor"}</h4>
+                        <p className="text-slate-500 text-sm">{appt.doctorId?.specialization || "General"}</p>
+
+                        {/* 🟢 UPDATED: Clickable link to open the PDF */}
+                        {appt.attachedReportUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevents triggering other clicks on the card
+                              window.open(appt.attachedReportUrl, "_blank");
+                            }}
+                            className="flex items-center gap-1.5 w-fit text-xs font-bold text-[#5747e6] mt-1 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition-all"
+                            title="View your attached report"
+                          >
+                            <FileText className="w-3 h-3" /> View Attached Report
+                          </button>
+                        )}
                       </div>
-                      <h4 className="text-lg font-bold text-slate-900 font-display">Dr. {appt.doctorId?.userId?.fullName || "Doctor"}</h4>
-                      <p className="text-slate-500 text-sm">{appt.doctorId?.specialization || "General"}</p>
 
-                      {/* 🟢 UPDATED: Clickable link to open the PDF */}
-                      {appt.attachedReportUrl && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevents triggering other clicks on the card
-                            window.open(appt.attachedReportUrl, "_blank");
-                          }}
-                          className="flex items-center gap-1.5 w-fit text-xs font-bold text-[#5747e6] mt-1 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition-all"
-                          title="View your attached report"
-                        >
-                          <FileText className="w-3 h-3" /> View Attached Report
+                      {/* Actions */}
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        {/* 🟢 PATIENT VIDEO BUTTON */}
+                        <button onClick={() => setActiveCallLink(appt.meetLink || `https://meet.jit.si/MediFlow_Legacy_${appt._id}`)} className="w-full sm:w-auto bg-[#5747e6] hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all shadow-lg shadow-[#5747e6]/30 flex gap-2 items-center justify-center">
+                          <Video className="w-5 h-5" /> Join Video Call
                         </button>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3">
-                      {/* 🟢 PATIENT VIDEO BUTTON */}
-                      <button onClick={() => setActiveCallLink(appt.meetLink)} className="w-full sm:w-auto bg-[#5747e6] hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all shadow-lg shadow-[#5747e6]/30 flex gap-2 items-center justify-center">
-                        <Video className="w-5 h-5" /> Join Call
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAppointmentToCancel(appt._id);
-                          setShowCancelModal(true);
-                        }}
-                        className="w-full sm:w-auto bg-white border border-red-200 text-red-500 hover:bg-red-50 font-medium py-2.5 px-6 rounded-lg transition-all flex gap-2 items-center justify-center"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => {
+                            setAppointmentToCancel(appt._id);
+                            setShowCancelModal(true);
+                          }}
+                          className="w-full sm:w-auto bg-white border border-red-200 text-red-500 hover:bg-red-50 font-medium py-2.5 px-6 rounded-lg transition-all flex gap-2 items-center justify-center"
+                        >
+                          Cancel
+                        </button>
+                      </div>
 
                   </div>
                 ))}

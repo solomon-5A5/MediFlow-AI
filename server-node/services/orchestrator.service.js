@@ -1,41 +1,64 @@
-const analyzeCBC = require("./analyzers/cbc.analyzer");
-const analyzeRFT = require("./analyzers/rft.analyzer");
-const analyzeLFT = require("./analyzers/lft.analyzer");     // 🟢 NEW
-const analyzeLipid = require("./analyzers/lipid.analyzer"); // 🟢 NEW
+const LabReference = require("../models/labReference.model"); 
+const { evaluate } = require("../utils/evaluator");           
 
 module.exports = async function orchestrator(text, patientMeta) {
-    const analyzerPromises = [];
+    const allReferences = await LabReference.find({});
+    const resultsByPanel = {};
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // CBC Keywords
-    if (text.match(/Hemoglobin|WBC|RBC|Complete Blood Count|Leukocyte/i)) {
-        console.log("🧬 Orchestrator: CBC Panel Detected");
-        analyzerPromises.push(analyzeCBC(text, patientMeta));
+    for (const ref of allReferences) {
+        const aliasList = ref.aliases.map(escapeRegExp).join('|');
+
+        // 🟢 THE GOD-MODE REGEX 🟢
+        // 1. Matches the Alias
+        // 2. Absorbs leader dots and noise: [\s\.:\-*_]*
+        // 3. Ignores H/L/* flags
+        // 4. THE CAPTURE GROUP NOW GRABS:
+        //    - Numbers with < or > signs (e.g., "< 0.5")
+        //    - Ratios (e.g., "1.5:1" or "0.8/1")
+        //    - Standard Medical Text (Positive, Negative, Reactive, Clear, etc.)
+        const medicalText = "Positive|Negative|Reactive|Non-Reactive|Clear|Pale Yellow|Yellow|Trace|Absent|Present|Normal|Abnormal";
+        const regex = new RegExp(`(?:${aliasList})[\\s\\.:\\-*_]*(?:[HL]\\s*|\\*\\s*)?([<>]?\\s*[\\d,]+\\.?\\d*(?:\\s*[:\\/]\\s*[\\d\\.]+)?|${medicalText})`, 'i');
+
+        const match = text.match(regex);
+
+        if (match && match[1]) {
+            let rawValue = match[1].trim();
+            let finalValue;
+
+            // 🧠 SMART PARSING LOGIC
+            // If the value is strictly a number (like "15.2" or "5,100"), convert it to a Float
+            if (/^[\d,\.]+$/.test(rawValue)) {
+                finalValue = parseFloat(rawValue.replace(/,/g, ''));
+            } else {
+                // If it is a Ratio ("1.5:1"), a Limit ("<0.5"), or Text ("Positive"), keep it as a String!
+                finalValue = rawValue;
+            }
+
+            // Evaluate the status (Normal/High/Low)
+            const status = evaluate(finalValue, ref, patientMeta);
+
+            if (!resultsByPanel[ref.panel]) {
+                resultsByPanel[ref.panel] = [];
+            }
+
+            resultsByPanel[ref.panel].push({
+                testCode: ref.testCode,
+                testName: ref.testName,
+                value: finalValue,
+                unit: ref.unit || "", // Some text tests don't have units
+                status
+            });
+        }
     }
 
-    // RFT Keywords
-    if (text.match(/Creatinine|Urea|BUN|Uric Acid|Renal|Kidney/i)) {
-        console.log("🧪 Orchestrator: RFT Panel Detected");
-        analyzerPromises.push(analyzeRFT(text, patientMeta));
-    }
+    const unifiedPayload = Object.keys(resultsByPanel).map(panelName => ({
+        panel: panelName,
+        metrics: resultsByPanel[panelName]
+    }));
 
-    // 🟢 LFT (Liver) Keywords
-    if (text.match(/ALT|AST|Bilirubin|Alkaline Phosphatase|Liver|LFT|SGPT|SGOT/i)) {
-        console.log("🟡 Orchestrator: LFT Panel Detected");
-        analyzerPromises.push(analyzeLFT(text, patientMeta));
-    }
+    const totalFound = unifiedPayload.reduce((acc, p) => acc + p.metrics.length, 0);
+    console.log(`🧠 Universal Engine detected ${totalFound} parameters across ${unifiedPayload.length} panels.`);
 
-    // 🟢 Lipid Profile (Heart) Keywords
-    if (text.match(/Cholesterol|HDL|LDL|Triglycerides|Lipid/i)) {
-        console.log("🟠 Orchestrator: Lipid Panel Detected");
-        analyzerPromises.push(analyzeLipid(text, patientMeta));
-    }
-
-    // 2. Execute all detected analyzers concurrently
-    const rawResults = await Promise.all(analyzerPromises);
-
-    // 3. Filter out any empty panels
-    const validResults = rawResults.filter(panel => panel.metrics && panel.metrics.length > 0);
-
-    // 4. Return the unified payload
-    return validResults;
+    return unifiedPayload;
 };

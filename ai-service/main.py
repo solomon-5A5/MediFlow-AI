@@ -26,6 +26,21 @@ NEO4J_USER = os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# Create a global driver for startup indexes
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+def factory_reset_neo4j():
+    with driver.session() as session:
+        try:
+            # This Cypher query finds every node and deletes it along with its relationships
+            session.run("MATCH (n) DETACH DELETE n")
+            print("💥 Neo4j Factory Reset Complete. The John Doe data has been vaporized.")
+        except Exception as e:
+            print(f"⚠️ Reset failed: {e}")
+
+# Run this once when the server starts
+factory_reset_neo4j()
+
 app = FastAPI(title="MediFlow Vision AI", version="4.0")
 
 app.add_middleware(
@@ -47,6 +62,40 @@ embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 print("⚡ Initializing Groq Client...")
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+
+
+def generate_chat_title(first_user_message: str) -> str:
+    """
+    Industry-standard background task to generate concise chat titles.
+    """
+    fallback = first_user_message[:25] + "..." if len(first_user_message) > 25 else first_user_message
+
+    try:
+        system_prompt = (
+            "You are a title generator for a medical AI platform. "
+            "Read the user's message and summarize the core medical topic in 3 to 5 words max. "
+            "Do NOT use quotes, periods, or conversational filler. Capitalize it like a title."
+        )
+
+        response = groq_client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": first_user_message}
+            ],
+            temperature=0.3,
+            max_tokens=15
+        )
+
+        title = response.choices[0].message.content.strip().replace('"', '')
+        return title
+    except Exception as e:
+        print(f"⚠️ Title generation failed, using fallback: {e}")
+        return fallback
+
+
+class ChatTitleRequest(BaseModel):
+    first_user_message: str
 
 # Neo4j Query Definition for Searching
 VECTOR_SEARCH_QUERY = """
@@ -79,7 +128,12 @@ MERGE (event)-[:FOR_DISEASE]->(d)
 # 🟢 NEW: Add patient_id parameter
 def get_graph_context(question: str, patient_id: str):
     """Converts the question to a vector and searches Neo4j for a specific patient."""
-    question_embedding = embedder.encode(question).tolist()
+    
+    # 🟢 THE FIX: Query Augmentation
+    # We silently inject keywords so the Vector DB can connect "I" to the patient's medical history
+    optimized_query = f"Patient medical history, primary diagnosis, and current conditions related to: {question}"
+    question_embedding = embedder.encode(optimized_query).tolist()
+    
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
     context_records = []
     try:
@@ -90,13 +144,20 @@ def get_graph_context(question: str, patient_id: str):
                 question_embedding=question_embedding,
                 patient_id=patient_id
             )
-            for record in result:
-                context_records.append({
-                    "patient": record["patient"],
-                    "disease": record["disease"],
-                    "notes": record["notes"],
-                    "similarity_score": round(record["score"], 4)
-                })
+            
+            # THE FIREWALL: Process matches and reject if best match is weak
+            records_list = list(result)
+            if records_list and records_list[0]["score"] < 0.70:
+                return []
+                
+            for record in records_list:
+                if record["score"] >= 0.70:
+                    context_records.append({
+                        "patient": record["patient"],
+                        "disease": record["disease"],
+                        "notes": record["notes"],
+                        "similarity_score": round(record["score"], 4)
+                    })
         return context_records
     finally:
         driver.close()
@@ -197,6 +258,15 @@ async def doctor_chatbot(request: Request):
         print(f"Chatbot Error: {e}")
         return {"success": False, "reply": "I'm sorry, I encountered an error processing that request."}
 
+
+@app.post("/api/chat-title")
+async def chat_title(request: ChatTitleRequest):
+    if not groq_client:
+        raise HTTPException(status_code=500, detail="Groq API key is missing.")
+
+    title = generate_chat_title(request.first_user_message)
+    return {"success": True, "title": title}
+
 @app.post("/api/graph-chat")
 async def graph_rag_chat(request: GraphChatRequest):
     if not groq_client:
@@ -269,7 +339,7 @@ async def ingest_patient_report(
             raise HTTPException(status_code=400, detail="Could not extract readable text from this PDF. It might be a scanned image.")
 
         # 2. Use Groq to quickly identify the primary condition/focus of the report
-        extraction_prompt = f"Read the following medical report text and extract the primary disease, condition, or test focus. Return ONLY the condition name (1-4 words max), nothing else. Text: {extracted_text[:1500]}"
+        extraction_prompt = f"Read the following medical report text and extract the primary disease, condition, or test focus. CRITICAL INSTRUCTION: Resolve all medical coreferences before extracting entities (e.g., if the text says 'the offending agent was suspended', link it back to 'Methotrexate'). You MUST output the results STRICTLY as a JSON list of triplets [Entity1, Relationship, Entity2]. Do NOT include any conversational filler, introductory text, or explanations. Output ONLY the data. Text: {extracted_text[:1500]}"
         try:
             completion = groq_client.chat.completions.create(
                 messages=[{"role": "user", "content": extraction_prompt}],
@@ -279,21 +349,29 @@ async def ingest_patient_report(
         except Exception:
             extracted_disease = "General Medical Report"
 
-        # 3. Generate the Vector Embedding
-        embedding = embedder.encode(extracted_text).tolist()
-        event_id = f"EVT_{uuid.uuid4().hex[:8]}"
-
+        # 3. Generate the Vector Embedding (with chunking)
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+        chunks = text_splitter.split_text(extracted_text)
+        
+        print(f"🕵️ Number of chunks extracted: {len(chunks)}")
+        if len(chunks) > 0:
+            print(f"🕵️ First chunk preview: {chunks[0][:100]}")
+        
         # 4. Save to Neo4j
         driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
         with driver.session() as session:
-            session.run(
-                INGEST_GRAPH_QUERY,
-                patient_id=patient_id,
-                disease=extracted_disease,
-                event_id=event_id,
-                notes=extracted_text,
-                embedding=embedding
-            )
+            for i, chunk in enumerate(chunks):
+                event_id = f"EVT_{uuid.uuid4().hex[:8]}_{i}"
+                embedding = embedder.encode(chunk).tolist()
+                session.run(
+                    INGEST_GRAPH_QUERY,
+                    patient_id=patient_id,
+                    disease=extracted_disease,
+                    event_id=event_id,
+                    notes=chunk,
+                    embedding=embedding
+                )
         driver.close()
 
         return {

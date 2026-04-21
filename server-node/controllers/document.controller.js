@@ -14,6 +14,14 @@ const uploadAndAnalyzePDF = async (req, res) => {
         const result = await parser.getText();
         const rawText = result.text;
 
+        // 🟢 TEMPORARY DEBUGGING BLOCK 🟢
+        const testIndex = rawText.indexOf("Total Cholesterol");
+        if (testIndex !== -1) {
+            console.log("🕵️ RAW TEXT SCRAMBLE AROUND CHOLESTEROL:");
+            // Print the word and the next 150 characters exactly as the computer sees them
+            console.log(JSON.stringify(rawText.substring(testIndex, testIndex + 150))); 
+        }
+
         console.log("📄 Extracted Text Preview:", rawText.substring(0, 100));
 
         const patientMeta = { age: 30, gender: "Male" };

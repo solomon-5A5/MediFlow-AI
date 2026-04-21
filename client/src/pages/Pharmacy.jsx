@@ -6,12 +6,13 @@ import toast from 'react-hot-toast';
 import {
     LayoutDashboard, Calendar, Search, Plus,
     ShoppingCart, Pill, LogOut, Check, Star,
-    Sparkles, Package, Info, FlaskConical
+    Sparkles, Package, Info, FlaskConical,
+    Activity, BrainCircuit, History as HistoryIcon
 } from 'lucide-react';
 
 const Pharmacy = () => {
     const { user, logout } = useAuth();
-    const { cart, addToCart } = useCart();
+    const { cart, addToCart, processCheckout } = useCart();
     const navigate = useNavigate();
 
     // --- STATE ---
@@ -95,38 +96,24 @@ const Pharmacy = () => {
         return categoryMatch && searchMatch;
     });
 
-    // --- CHECKOUT ---
+    // --- CHECKOUT (Razorpay Integration) ---
     const handleCheckout = async () => {
         if (cart.length === 0) return toast.error("Cart is empty!");
 
-        const total = cart.reduce((sum, item) => sum + item.price, 0);
-        const toastId = toast.loading("Processing Payment...");
+        // Calculate total
+        const totalAmount = cart.reduce((sum, item) => sum + item.price, 0);
 
-        try {
-            const res = await fetch("http://localhost:5001/api/orders/create", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    patientId: user.id || user._id,
-                    items: cart.map(item => ({
-                        medicineId: item._id,
-                        name: item.name,
-                        price: item.price,
-                        quantity: 1
-                    })),
-                    totalAmount: total
-                })
-            });
-
-            if (res.ok) {
-                toast.success("Order Placed Successfully!", { id: toastId });
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                toast.error("Order Failed", { id: toastId });
-            }
-        } catch (err) {
-            toast.error("Server Error", { id: toastId });
-        }
+        // Call the global Razorpay checkout function from Context
+        processCheckout(user, totalAmount, () => {
+            // This callback runs ONLY if the Razorpay payment succeeds
+            toast.success("Order Placed Successfully!");
+            
+            // Refresh the orders table instantly without reloading the page
+            fetchOrders(); 
+            
+            // Redirect to the success screen
+            navigate('/payment-success'); 
+        });
     };
 
     return (
@@ -144,42 +131,58 @@ const Pharmacy = () => {
         `}</style>
 
             {/* SIDEBAR */}
-            <aside className="w-20 lg:w-72 flex-shrink-0 flex flex-col justify-between bg-white border-r border-gray-100 transition-all duration-300 z-20">
-                <div className="flex flex-col h-full p-4 lg:p-6">
-                    <div className="flex items-center gap-4 mb-10 pl-2">
-                        <div className="bg-[#5747e6]/10 p-2 rounded-xl"><Pill className="text-[#5747e6] w-6 h-6" /></div>
-                        <div className="hidden lg:flex flex-col">
-                            <h1 className="text-[#100e1b] text-lg font-bold leading-tight font-display">Health Hive</h1>
-                            <p className="text-[#575095] text-xs font-medium">Pharmacy V2</p>
-                        </div>
+            <aside className="hidden md:flex flex-col w-72 h-full bg-white border-r border-slate-200 p-6 z-20">
+                <div className="flex items-center gap-3 mb-10">
+                    <div className="size-10 rounded-xl bg-[#5747e6] flex items-center justify-center text-white shadow-lg shadow-[#5747e6]/30">
+                        <Activity className="w-6 h-6" />
                     </div>
+                    <h1 className="text-xl font-bold tracking-tight font-display">MediFlow AI</h1>
+                </div>
 
-                    <nav className="flex flex-col gap-2 flex-1 font-display">
-                        <a href="/dashboard" className="flex items-center gap-4 px-4 py-3 text-[#575095] hover:bg-gray-50 rounded-xl transition-colors group">
-                            <LayoutDashboard className="w-5 h-5 group-hover:text-[#5747e6] transition-colors" />
-                            <span className="hidden lg:block text-sm font-medium">Dashboard</span>
-                        </a>
-                        <a href="#" className="flex items-center gap-4 px-4 py-3 bg-[#5747e6]/10 text-[#5747e6] rounded-xl transition-colors">
-                            <Pill className="w-5 h-5 fill-current" />
-                            <span className="hidden lg:block text-sm font-bold">Medicines</span>
-                        </a>
-                        <a href="/dashboard#booking" className="flex items-center gap-4 px-4 py-3 text-[#575095] hover:bg-gray-50 rounded-xl transition-colors group">
-                            <Calendar className="w-5 h-5 group-hover:text-[#5747e6] transition-colors" />
-                            <span className="hidden lg:block text-sm font-medium">Consultations</span>
-                        </a>
-                        <a href="/lab-tests" className="flex items-center gap-4 px-4 py-3 text-[#575095] hover:bg-gray-50 rounded-xl transition-colors group">
-                            <FlaskConical className="w-5 h-5 group-hover:text-[#5747e6] transition-colors" />
-                            <span className="hidden lg:block text-sm font-medium">Lab Tests</span>
-                        </a>
-                        <button onClick={logout} className="flex items-center gap-4 px-4 py-3 text-[#575095] hover:bg-red-50 hover:text-red-500 rounded-xl transition-colors group mt-auto">
-                            <LogOut className="w-5 h-5" />
-                            <span className="hidden lg:block text-sm font-medium">Logout</span>
-                        </button>
-                    </nav>
+                <nav className="flex flex-col gap-2 flex-1 font-display">
+                    <a href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+                        <LayoutDashboard className="w-5 h-5" />
+                        <span className="font-medium">Overview</span>
+                    </a>
+                    <a href="/dashboard#booking" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+                        <Calendar className="w-5 h-5" />
+                        <span className="font-medium">Book Appointment</span>
+                    </a>
+                    <a href="/lab-tests" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+                        <Activity className="w-5 h-5" />
+                        <span className="font-medium">Smart Diagnostics</span>
+                    </a>
+                    <a href="/ai-assistant" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+                        <BrainCircuit className="w-5 h-5" />
+                        <span className="font-medium">AI Co-Pilot</span>
+                    </a>
+                    <a href="/pharmacy" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#5747e6] text-white shadow-md shadow-[#5747e6]/25 transition-all">
+                        <Pill className="w-5 h-5" />
+                        <span className="font-medium">Pharmacy</span>
+                    </a>
+                    <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-[#5747e6] transition-colors">
+                        <HistoryIcon className="w-5 h-5" />
+                        <span className="font-medium">History</span>
+                    </a>
+                </nav>
 
-                    <button onClick={handleCheckout} className="hidden lg:flex w-full items-center justify-center gap-2 bg-[#5747e6] hover:bg-[#4638b9] text-white py-3 rounded-xl font-bold shadow-lg shadow-[#5747e6]/30 transition-all mt-4">
+                <div className="mt-auto pt-6 border-t border-slate-100 flex flex-col gap-4">
+                    <button onClick={handleCheckout} className="w-full flex items-center justify-center gap-2 bg-[#5747e6] hover:bg-[#4638b9] text-white py-3 rounded-xl font-bold shadow-lg shadow-[#5747e6]/30 transition-all">
                         <Check className="w-5 h-5" /> Checkout ({cart.length})
                     </button>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-[#5747e6] font-bold text-lg border border-slate-200">
+                            {user?.fullName?.charAt(0)}
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-sm font-bold text-slate-900 line-clamp-1">{user?.fullName}</p>
+                            <p className="text-xs text-slate-500">#{(user?.id || user?._id || '').slice(-5)}</p>
+                        </div>
+                        <button onClick={() => { logout(); navigate("/"); }} className="ml-auto text-slate-400 hover:text-red-500 transition-colors">
+                            <LogOut className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </aside>
 

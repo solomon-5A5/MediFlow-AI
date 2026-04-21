@@ -43,9 +43,9 @@ const bookAppointment = async (req, res) => {
       console.log("✅ Upload successful:", attachedReportUrl);
     }
 
-    // 🟢 Generate a highly secure, unique Jitsi room link
-    const uniqueRoomId = crypto.randomBytes(12).toString("hex");
-    const meetLink = `https://meet.jit.si/MediFlow_Consultation_${uniqueRoomId}`;
+    // 🟢 Generate a secure, unique Room ID for Jitsi
+    const uniqueString = crypto.randomBytes(8).toString('hex');
+    const meetLink = `https://meet.jit.si/MediFlow_Consult_${uniqueString}`;
 
     const newAppointment = new Appointment({
       patientId,

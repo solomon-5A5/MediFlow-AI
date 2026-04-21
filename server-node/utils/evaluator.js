@@ -6,7 +6,18 @@
  * @returns {String} "Normal", "High", "Low", "Critical High", "Critical Low"
  */
 function evaluate(value, referenceDoc, patientMeta = { age: 30, gender: "All" }) {
-    if (!referenceDoc || isNaN(value)) return "Unknown";
+    if (!referenceDoc) return "Unknown";
+
+    // If the value is text (e.g., "Positive" or "1.5:1"), skip the math checks
+    if (typeof value === 'string') {
+        const textLower = value.toLowerCase();
+        if (textLower.includes("reactive") || textLower.includes("positive") || textLower.includes("abnormal")) {
+            return "Critical High"; // Turns the chip red!
+        }
+        return "Normal"; // For "Negative", "Clear", "Pale Yellow", etc.
+    }
+
+    if (isNaN(value)) return "Unknown";
 
     // 1. Check Critical Levels First
     if (referenceDoc.criticalLow !== undefined && value <= referenceDoc.criticalLow) return "Critical Low";

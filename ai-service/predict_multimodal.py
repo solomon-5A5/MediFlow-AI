@@ -250,7 +250,11 @@ def predict_multimodal(image_bytes, clinical_data, densenet, resnet, device, ens
             print(f"Gemini API Error: {e}")
 
         # 🟢 4. ENSEMBLE AVERAGING & HEATMAP
-        ensemble_probs = (probs_d + probs_r) / 2.0
+        
+        # THE FIX: Max-Confidence Ensembling (Trust the Specialist)
+        # Instead of diluting the probabilities, we take the highest confidence from either model.
+        # This prevents the "Anchor Effect" and drastically improves Recall for severe diseases.
+        ensemble_probs = np.maximum(probs_d, probs_r)
 
         pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
         for i in range(activations.shape[1]): activations[:, i, :, :] *= pooled_gradients[i]
@@ -277,7 +281,7 @@ def predict_multimodal(image_bytes, clinical_data, densenet, resnet, device, ens
         high_priority = []
         secondary = []
         no_finding_prob = float(ensemble_probs[0])
-        SENSITIVITY = 0.85 
+        SENSITIVITY = 1.0 
         
         for i in range(1, 14):
             disease = DISEASE_CLASSES[i]
@@ -292,7 +296,10 @@ def predict_multimodal(image_bytes, clinical_data, densenet, resnet, device, ens
         high_priority = sorted(high_priority, key=lambda x: x["confidence"], reverse=True)
         secondary = sorted(secondary, key=lambda x: x["confidence"], reverse=True)
 
-        overall_status = "Review Recommended" if len(high_priority) > 0 else "Normal Evaluation"
+        # Tie the UI banner directly to the calculated Risk Score severity
+        risk_data = compute_risk_score(ensemble_probs, ensemble_thresholds)
+        overall_status = "Review Recommended" if risk_data["value"] >= 2.5 else "Normal Evaluation"
+        
         primary_flag = high_priority[0]["disease"] if len(high_priority) > 0 else "No Finding"
         flag_confidence = high_priority[0]["confidence"] if len(high_priority) > 0 else no_finding_prob
 
@@ -304,7 +311,7 @@ def predict_multimodal(image_bytes, clinical_data, densenet, resnet, device, ens
             "high_priority_findings": high_priority,
             "secondary_anomalies": secondary,
             "evaluated_negative": [],
-            "risk_score": compute_risk_score(ensemble_probs, ensemble_thresholds),
+            "risk_score": risk_data,
             "clinical_suggestion": "See Consensus Panel for detailed AI analysis.",
             "heatmap_image": heatmap_data_uri, 
             "heatmap_target": DISEASE_CLASSES[d_top_idx],
