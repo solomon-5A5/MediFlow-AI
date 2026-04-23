@@ -237,7 +237,7 @@ const Dashboard = () => {
                         <div className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-1 bg-slate-50 w-fit px-2 py-1 rounded-md">
                           <Clock className="w-4 h-4" /> {appt.timeSlot} • Video Consultation
                         </div>
-                        <h4 className="text-lg font-bold text-slate-900 font-display">Dr. {appt.doctorId?.userId?.fullName || "Doctor"}</h4>
+                        <h4 className="text-lg font-bold text-slate-900 font-display">{appt.doctorId?.userId?.fullName || "Doctor"}</h4>
                         <p className="text-slate-500 text-sm">{appt.doctorId?.specialization || "General"}</p>
 
                         {/* 🟢 UPDATED: Clickable link to open the PDF */}
@@ -301,7 +301,7 @@ const Dashboard = () => {
                           <Calendar className="w-5 h-5" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-900">Dr. {appt.doctorId?.name || appt.doctorId?.userId?.fullName || "Doctor"}</h4>
+                          <h4 className="font-bold text-slate-900"> {appt.doctorId?.name || appt.doctorId?.userId?.fullName || "Doctor"}</h4>
                           <p className="text-xs text-slate-500 font-medium">{appt.date} • {appt.timeSlot}</p>
                         </div>
                       </div>

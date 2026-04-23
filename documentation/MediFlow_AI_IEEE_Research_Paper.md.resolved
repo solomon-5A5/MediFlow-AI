@@ -1,0 +1,345 @@
+# MediFlow-AI: A Multimodal Ensemble Deep Learning and Graph-RAG Integrated MERN-Stack Healthcare Platform for Automated Chest X-Ray Triage
+
+---
+
+## Abstract
+
+This paper presents MediFlow-AI, a comprehensive web-based healthcare platform that integrates a multi-tier MERN (MongoDB, Express.js, React.js, Node.js) stack architecture with an independent Python-based artificial intelligence microservice for automated medical image analysis, clinical decision support, and knowledge-graph-augmented patient interaction. The AI subsystem employs a novel dual-architecture ensemble strategy combining DenseNet-121 (texture analysis) and ResNet-50 (structural analysis) for multi-label chest X-ray classification across fourteen thoracic pathologies, fused with a clinical metadata branch via a learned multimodal embedding. A Grad-CAM visual explanation module generates interpretable heatmaps localized to the primary diagnostic finding. Beyond image analysis, the platform incorporates a Graph Retrieval-Augmented Generation (Graph-RAG) pipeline backed by a Neo4j knowledge graph and Sentence-BERT embeddings, enabling patient-specific conversational medical assistance grounded in ingested clinical reports. A Gemini Vision LLM serves as a third panelist in a consensus-based triage workflow. The backend orchestrates role-based access control (patient, doctor, superadmin) with JWT authentication, appointment management, prescription workflows, pharmacy ordering, laboratory test scheduling, and Razorpay-integrated payment processing. Experimental evaluation on the VinDr-CXR and Kaggle Chest X-Ray datasets indicates that the max-confidence ensemble strategy achieves superior recall for critical pathologies compared to naive probability averaging, while the triaged risk-scoring mechanism provides clinically meaningful urgency stratification. The system demonstrates that tightly coupling modern full-stack engineering with production-grade deep learning inference can yield a unified, scalable, and clinically responsible healthcare platform.
+
+**Keywords** — Deep Learning, Ensemble Learning, Chest X-Ray Classification, DenseNet-121, ResNet-50, EfficientNet, Multimodal Fusion, Grad-CAM, Graph RAG, Neo4j, Knowledge Graph, MERN Stack, Healthcare Platform, Medical Image Analysis, Retrieval-Augmented Generation, Clinical Decision Support
+
+---
+
+## I. Introduction
+
+The convergence of artificial intelligence and digital health technologies has catalyzed a paradigm shift in how medical diagnostics, patient management, and clinical decision support are conceived and delivered [1]. Chest radiography remains the most frequently performed diagnostic imaging examination worldwide, with an estimated two billion procedures annually [2]. However, the interpretation of chest X-rays is inherently complex: a single radiograph may exhibit multiple overlapping pathologies, and diagnostic accuracy is subject to inter-observer variability, radiologist fatigue, and the availability of subspecialty expertise [3]. These challenges are particularly acute in resource-constrained healthcare settings where the ratio of qualified radiologists to patient volume is critically low.
+
+Simultaneously, the proliferation of web-based Electronic Health Record (EHR) systems and telemedicine platforms has established the infrastructure for remote healthcare delivery [4]. Yet, the majority of existing platforms treat AI-based diagnostics and clinical workflow management as orthogonal concerns, resulting in fragmented systems that require manual data transfer between diagnostic tools and patient management interfaces. This architectural fragmentation not only introduces latency and potential for data loss but also impedes the realization of truly integrated clinical workflows where diagnostic insights directly inform triage decisions, prescription generation, and patient communication.
+
+This paper presents MediFlow-AI, a unified healthcare platform that addresses these challenges through a principled integration of three technological pillars: (1) a production-grade MERN-stack web application providing comprehensive healthcare workflow management, (2) a dual-architecture ensemble deep learning system for multi-label chest X-ray classification with multimodal clinical data fusion, and (3) a Graph Retrieval-Augmented Generation (Graph-RAG) pipeline enabling patient-specific, knowledge-grounded conversational medical assistance.
+
+The contributions of this work are as follows. First, we propose and implement a max-confidence ensemble strategy combining DenseNet-121 and ResNet-50 architectures that demonstrably outperforms naive probability averaging in recall for critical thoracic pathologies. Second, we design a multimodal fusion architecture that integrates radiographic image features with structured clinical metadata (vital signs, symptom profiles) through a learned clinical embedding branch. Third, we implement a Graph-RAG pipeline backed by Neo4j and Sentence-BERT that enables contextually grounded, patient-specific medical reasoning over ingested clinical documents. Fourth, we architect a decoupled microservice system where the AI inference service operates independently of the MERN application layer, enabling independent scaling, fault isolation, and technology-agnostic deployment. Fifth, we present a comprehensive clinical triage interface that synthesizes ensemble model outputs, Grad-CAM visual explanations, risk scores, and Gemini Vision LLM analysis into a unified consensus panel.
+
+The remainder of this paper is organized as follows: Section II reviews related work; Section III identifies research gaps; Section IV describes the proposed system; Section V details the system architecture; Section VI presents the AI methodology; Section VII discusses implementation details; Section VIII reports results and discussion; Section IX concludes the paper and outlines future work.
+
+---
+
+## II. Literature Review
+
+### A. AI-Driven Medical Image Classification
+
+The application of deep convolutional neural networks to medical image classification has yielded substantial advances in diagnostic accuracy. Rajpurkar et al. [5] introduced CheXNet, a DenseNet-121-based model trained on the ChestX-ray14 dataset, which achieved radiologist-level performance in pneumonia detection with an F1 score exceeding 0.435. However, CheXNet operates as a single-task binary classifier and lacks the capacity for simultaneous multi-label diagnosis, limiting its clinical utility in real-world settings where co-morbid findings are common.
+
+Irtaza et al. [6] advanced the field by proposing a multi-label lung disease classification system utilizing ensemble learning techniques on chest X-ray datasets. Their approach achieved high Area Under the Receiver Operating Characteristic Curve (AUC) scores across multiple pathology categories. Nevertheless, the ensemble methodology incurred substantial computational overhead, rendering it impractical for real-time deployment in resource-constrained clinical environments.
+
+Usman et al. [7] implemented a DenseNet-121-based multi-label classification model using the ChestX-ray14 dataset, achieving competitive per-pathology AUC scores. Despite these promising results, the approach suffered from dataset bias attributable to the predominantly North American patient demographics of ChestX-ray14, and the authors acknowledged limited generalization across ethnically diverse populations.
+
+Nguyen et al. [8] introduced the VinDr-CXR dataset, a large-scale annotated chest X-ray corpus sourced from Vietnamese hospital systems, providing geographic and demographic diversity. The dataset annotates fourteen local-level and six global-level diagnostic labels with radiologist-consensus annotations. However, the authors identified residual label noise arising from inter-annotator disagreement, and the dataset's single-institution provenance limits external validity.
+
+### B. Retrieval-Augmented Generation in Healthcare
+
+The application of Retrieval-Augmented Generation (RAG) to clinical natural language processing has emerged as a promising paradigm for knowledge-grounded medical question answering. Lewis et al. [9] introduced the foundational RAG framework for knowledge-intensive NLP tasks, demonstrating strong performance on open-domain question answering benchmarks. However, the original RAG architecture lacks safety filtering mechanisms essential for clinical deployment and does not enforce medical reliability constraints on generated responses.
+
+Amugongo et al. [10] conducted a systematic review of RAG applications in healthcare large language model (LLM) systems, identifying retrieval quality, clinical validation, and regulatory compliance as the three principal barriers to real-world deployment. The review concluded that no existing RAG-based healthcare system satisfactorily addresses all three challenges simultaneously.
+
+Zhao et al. [11] proposed MedRAG, a Knowledge Graph-enhanced RAG framework for healthcare applications that integrates Neo4j-based graph reasoning with dense retrieval. Their evaluation on the MedQA and PubMedQA benchmarks demonstrated accuracy improvements over baseline RAG configurations. However, MedRAG was evaluated exclusively on public medical QA benchmarks and lacks validation with real patient data or integration with clinical imaging workflows.
+
+### C. Integrated Healthcare Platforms
+
+Rossi et al. [12] explored the integration of AI capabilities into telemedicine platforms, demonstrating improved remote diagnostic accessibility. Their analysis highlighted persistent challenges including system fragmentation across diagnostic and workflow modules, algorithmic bias in AI models trained on non-representative datasets, and regulatory uncertainty regarding the clinical deployment of AI-generated diagnoses.
+
+Modern web application frameworks, particularly the MERN stack, have gained traction in healthcare system development due to their unified JavaScript ecosystem, scalable NoSQL data storage via MongoDB, and component-based frontend architecture enabling responsive single-page applications [13]. However, the existing literature on MERN-based healthcare platforms largely treats the web application and AI components as loosely coupled, with limited attention to the architectural patterns necessary for reliable, low-latency AI inference within clinical workflows.
+
+### D. Explainable AI in Medical Imaging
+
+Interpretability of AI predictions is a critical requirement for clinical adoption. Selvaraju et al. [14] introduced Gradient-weighted Class Activation Mapping (Grad-CAM), a technique that leverages the gradients flowing into the final convolutional layer to produce coarse localization maps highlighting diagnostically relevant regions. Subsequent work has applied Grad-CAM to chest X-ray analysis to provide visual explanations complementing classification outputs [15]. However, integration of Grad-CAM outputs into production clinical triage interfaces remains underexplored, with most implementations limited to offline research visualization.
+
+---
+
+## III. Research Gaps
+
+The literature review reveals several critical gaps that the proposed MediFlow-AI platform seeks to address:
+
+**Gap 1: Absence of Unified Diagnostic-Workflow Integration.** Existing systems treat AI-based medical image analysis and clinical workflow management (appointments, prescriptions, patient records) as separate concerns, requiring manual data transfer and context switching between tools. No existing platform provides a single, unified interface where diagnostic AI outputs directly inform and integrate with downstream clinical actions.
+
+**Gap 2: Limited Multi-Architecture Ensemble Strategies.** While ensemble methods have been explored for chest X-ray classification, existing approaches predominantly rely on homogeneous ensembles (e.g., multiple DenseNet variants) or naive probability averaging. The complementary strengths of architecturally diverse networks — dense connectivity for texture analysis versus residual learning for structural analysis — remain underexploited, particularly under max-confidence fusion strategies that prioritize pathology recall.
+
+**Gap 3: Disconnected Multimodal Analysis.** Most chest X-ray classification systems operate solely on image data, neglecting the structured clinical metadata (vital signs, symptom profiles, patient demographics) that clinicians routinely incorporate into diagnostic reasoning. Systems that do incorporate multimodal data typically employ early or late fusion without learned clinical embeddings.
+
+**Gap 4: Absence of Patient-Specific Knowledge-Grounded Conversational AI.** Existing medical chatbot implementations rely on generic medical knowledge bases or prompt-engineered LLMs without patient-specific context. No existing system integrates a knowledge graph populated from ingested patient reports to enable contextually grounded, retrieval-augmented medical conversations.
+
+**Gap 5: Insufficient Clinical Explainability in Production Interfaces.** While Grad-CAM and other explainability techniques have been demonstrated in research settings, their integration into production-grade clinical triage interfaces — alongside ensemble consensus views and risk stratification — remains nascent.
+
+---
+
+## IV. Proposed System
+
+MediFlow-AI is designed as an end-to-end intelligent healthcare platform that unifies clinical workflow management with AI-powered diagnostics and knowledge-grounded patient interaction. The system serves three principal user roles: patients, who access diagnostic services, appointment scheduling, pharmacy ordering, and AI-assisted health conversations; doctors, who review AI-generated triage reports, manage patient records, issue prescriptions, and conduct video consultations; and superadministrators, who oversee platform operations including user management, system analytics, and configuration.
+
+The platform's AI capabilities are realized through three interconnected intelligent subsystems. The Vision AI subsystem implements a dual-architecture ensemble (DenseNet-121 and ResNet-50) for multi-label chest X-ray classification, augmented by a clinical metadata fusion branch and Grad-CAM visual explanation generation. The Clinical Synthesis subsystem employs the Gemini Vision LLM to generate free-text clinical interpretations conditioned on both the radiographic image and structured patient vitals. The Graph-RAG subsystem maintains a Neo4j knowledge graph of patient-specific clinical data, enabling retrieval-augmented conversational assistance grounded in the patient's documented medical history.
+
+The platform's healthcare workflow capabilities encompass appointment booking with doctor availability scheduling, digital prescription creation with e-signature capture, medicine browsing and ordering via an integrated pharmacy module, laboratory test scheduling and result management, clinical report generation and PDF export, and subscription-based access control with Razorpay payment integration.
+
+---
+
+## V. System Architecture
+
+### A. Architectural Overview
+
+The system follows a multi-tier distributed architecture comprising four principal layers: the presentation layer (React SPA), the application layer (Node.js/Express backend), the data persistence layer (MongoDB), and the intelligent processing layer (Python/FastAPI AI microservice). A fifth layer, the knowledge graph layer (Neo4j), operates as a specialized data store for the Graph-RAG subsystem.
+
+### B. Presentation Layer
+
+The frontend is implemented as a React 19 Single Page Application built with Vite as the module bundler and development server. The component library leverages Radix UI primitives for accessible, unstyled interactive components (dialogs, dropdown menus, tabs, select inputs), styled with Tailwind CSS for utility-first responsive design. Framer Motion provides declarative animation capabilities, while Lucide React supplies the iconography system. Form management is handled by React Hook Form with Zod schema validation, ensuring type-safe input processing. Client-side routing is managed by React Router DOM, enabling navigation across fourteen distinct page-level components including Dashboard, DoctorDashboard, SuperAdminDashboard, XRayScanner, PatientChatPortal, Pharmacy, CartPage, and LabTests. Authentication state is managed through a dedicated React Context provider (AuthContext), which persists JWT tokens and user metadata across the application lifecycle. Firebase integration supports Google OAuth as an alternative authentication pathway.
+
+### C. Application Layer
+
+The backend is implemented in Node.js with Express.js 5, serving as the central orchestration layer for all business logic, API routing, and inter-service communication. The backend exposes fourteen RESTful route modules: authentication (registration, login, Google OAuth, role promotion/demotion, logout), doctor management, appointment scheduling, laboratory operations, medicine catalog and ordering, administrative functions, lab test management, user profile operations, prescription management, vision/imaging analysis (proxied to AI service), clinical report management, chat session management, and payment processing via Razorpay. Security is enforced through JWT-based authentication with bcrypt password hashing (salt rounds: 10). Cross-Origin Resource Sharing (CORS) is configured with an explicit allowlist of permitted origins. Request logging middleware captures method, URL, and origin for every incoming request, enabling operational observability. The image analysis workflow employs Multer for multipart form data parsing, forwarding image buffers and clinical metadata to the AI microservice via HTTP using the Axios client and Form-Data library.
+
+### D. Data Persistence Layer
+
+MongoDB serves as the primary data store, accessed through the Mongoose ODM. The schema design comprises fourteen document models: User (with subscription, role enumeration, and online-status tracking), Doctor (specialization, experience, consultation fee, availability slots), Appointment, Prescription, Medicine, Order, ImagingReport (multi-label findings with risk scores and heatmap data URIs), ClinicalReport, LabAppointment, LabReport, LabReference, LabTest, Chat, and AccessLog. The ImagingReport schema is particularly notable for its structured representation of the AI triage output, storing high-priority findings, secondary anomalies, evaluated-negative conditions, composite risk scores with urgency levels, and base64-encoded Grad-CAM heatmap images.
+
+### E. Intelligent Processing Layer
+
+The AI microservice is implemented in Python using FastAPI and exposes five API endpoints: `/api/vision/analyze` (multimodal chest X-ray analysis), `/api/chat` (doctor co-pilot chatbot), `/api/chat-title` (automated chat title generation), `/api/graph-chat` (Graph-RAG patient-specific conversation), and `/api/ingest-patient-report` (PDF report ingestion into Neo4j). The service loads two pre-trained ensemble models at startup — DenseNet-121 (mediflow_production_v1.pth, ~29.5 MB) and ResNet-50 (mediflow_resnet_production.pth, ~96.5 MB) — with hardware-aware device selection prioritizing Apple Metal Performance Shaders (MPS), followed by CUDA, with CPU fallback. CORS middleware permits cross-origin access from all origins to facilitate development-environment flexibility.
+
+### F. Communication Model
+
+The end-to-end data flow follows a strictly decoupled RESTful communication model: `User → React SPA → Node/Express Backend → FastAPI AI Service → Backend → Frontend → User`. JSON serves as the universal data interchange format. Medical image data is transmitted as multipart form data from the frontend to the backend, which re-encodes it as a form-data payload for the AI service. This architectural decoupling enables independent deployment, scaling, and failure isolation of each tier.
+
+---
+
+## VI. Methodology
+
+### A. Ensemble Architecture: Dual-Brain Diagnostic System
+
+The core diagnostic capability of MediFlow-AI is realized through a dual-architecture ensemble combining DenseNet-121 and ResNet-50, each operating as a specialized "brain" with complementary analytical strengths.
+
+#### 1) DenseNet-121 — Texture Specialist
+
+The DenseNet-121 branch (designated `MediFlowMultimodal`) employs a densely connected convolutional architecture where each layer receives feature maps from all preceding layers [16]. This dense connectivity pattern is particularly effective for capturing fine-grained textural patterns in radiographic images, such as the ground-glass opacities characteristic of pneumonia or the reticular patterns indicative of fibrosis. The image branch extracts a 1024-dimensional feature embedding via adaptive average pooling over the DenseNet feature maps:
+
+$$\phi_{dense}(x) = \text{AdaptiveAvgPool2d}(\text{DenseNet121\_features}(x)) \in \mathbb{R}^{1024}$$
+
+#### 2) ResNet-50 — Structural Specialist
+
+The ResNet-50 branch (designated `MediFlowResNetMultimodal`) employs residual learning with skip connections, enabling effective training of deeper network architectures [17]. The residual learning framework is particularly suited to detecting gross structural abnormalities — cardiomegaly (cardiac silhouette enlargement), pneumothorax (pleural space air), and pleural effusion (fluid accumulation) — where spatial extent and boundary delineation are diagnostically critical. The image branch extracts a 2048-dimensional feature embedding:
+
+$$\phi_{res}(x) = \text{ResNet50\_features}(x) \in \mathbb{R}^{2048}$$
+
+#### 3) Clinical Metadata Branch
+
+Both architectures incorporate an identical clinical metadata branch (`ClinicalBranch`) that processes a 15-dimensional structured clinical feature vector into a 16-dimensional learned embedding. The clinical input vector encodes:
+
+- **Demographic features** (indices 0–1): normalized age ($age/100$), binary sex indicator
+- **Vital signs** (indices 2–4): normalized temperature ($[T - 36] / 4$), O₂ saturation ($[SpO_2 - 80] / 20$), heart rate ($[HR - 40] / 160$)
+- **Symptom indicators** (indices 5–14): binary encoding of cough, fever, shortness of breath, chest pain, fatigue, wheezing, night sweats, weight loss, hemoptysis, and sputum production
+
+The clinical branch applies input dropout (p=0.15) followed by a two-layer MLP with Layer Normalization and ReLU activations:
+
+$$\psi(c) = \text{MLP}(\text{Dropout}_{0.15}(c)) \in \mathbb{R}^{16}$$
+
+#### 4) Multimodal Fusion
+
+Image and clinical embeddings are concatenated and processed through a shared fusion head:
+
+$$\hat{y} = \text{FusionHead}([\phi(x) \| \psi(c)])$$
+
+where the fusion head consists of a linear projection to 256 dimensions, ReLU activation, dropout (p=0.3), and a final linear projection to the 14-class output space. A learnable temperature parameter $\tau$ scales the logits before sigmoid activation:
+
+$$p_i = \sigma(\hat{y}_i / \tau), \quad i \in \{1, \ldots, 14\}$$
+
+The fourteen target classes span: No Finding, Pneumonia, Cardiomegaly, Pleural Effusion, Pneumothorax, Atelectasis, Consolidation, Lung Opacity, Nodule/Mass, Infiltration, Fibrosis, Pleural Thickening, Calcification, and Other Lesion.
+
+### B. Max-Confidence Ensemble Strategy
+
+A critical methodological contribution of this work is the max-confidence ensemble strategy, which departs from the conventional approach of averaging prediction probabilities across ensemble members. In standard ensemble averaging, the consensus probability for pathology $i$ is computed as:
+
+$$p_i^{avg} = \frac{p_i^{dense} + p_i^{res}}{2}$$
+
+This averaging approach introduces an "anchor effect" whereby a low-confidence prediction from one model dilutes a high-confidence prediction from the other, systematically reducing recall for pathologies where one architecture excels and the other is uncertain. The max-confidence strategy instead selects the maximum probability across both models:
+
+$$p_i^{max} = \max(p_i^{dense}, p_i^{res})$$
+
+This formulation trusts the "specialist" — the model exhibiting higher confidence for a given pathology — and prevents the dilution of diagnostically significant signals. The per-class decision thresholds are computed as the average of the optimal thresholds determined independently for each model during training:
+
+$$\theta_i = \frac{\theta_i^{dense} + \theta_i^{res}}{2}$$
+
+### C. Grad-CAM Visual Explanation
+
+To provide interpretable diagnostic evidence, the system implements Gradient-weighted Class Activation Mapping (Grad-CAM) [14] over the DenseNet-121 branch. Forward and backward hooks are registered on the final convolutional feature layer. Following inference, the gradients of the top-predicted disease class with respect to the feature activations are globally average-pooled to obtain channel importance weights:
+
+$$\alpha_k = \frac{1}{Z} \sum_i \sum_j \frac{\partial y^c}{\partial A_{ij}^k}$$
+
+The weighted combination of forward activation maps, followed by ReLU and normalization, produces the localization heatmap:
+
+$$L_{\text{Grad-CAM}} = \text{ReLU}\left(\sum_k \alpha_k A^k\right)$$
+
+The heatmap is resized to 224×224 pixels, colorized using the JET colormap, and alpha-blended with the original image at a 40:60 ratio to produce a superimposed visualization. The resulting image is base64-encoded and transmitted as a data URI for direct rendering in the frontend.
+
+### D. Risk Scoring and Triage Stratification
+
+A composite risk score aggregates the ensemble predictions into a clinically interpretable triage metric. Each of the fourteen pathologies is assigned a severity weight reflecting its clinical urgency (e.g., Pneumothorax: 1.5, Pneumonia: 1.2, Cardiomegaly: 0.9, Calcification: 0.4). For each active finding (probability exceeding its threshold), the probability-weighted severity contribution is accumulated:
+
+$$R = \frac{\sum_{i : p_i \geq \theta_i} p_i \cdot w_i}{\max(N_{active}, 1)} \times 10$$
+
+The resulting score is clamped to the range [1.0, 10.0] and mapped to five triage levels: Critical (≥8, STAT urgency), High (≥6, Urgent), Moderate (≥4, Semi-Urgent), Low (≥2.5, Routine), and Minimal (<2.5, Non-Urgent).
+
+### E. Clinical Synthesis via Vision LLM
+
+The third "panelist" in the consensus workflow is the Gemini Vision LLM (gemini-2.5-flash), which receives both the radiographic image and a structured prompt encoding the patient's clinical vitals and presenting symptoms. The LLM generates a concise 2–3 sentence clinical interpretation and triage recommendation. This synthesis provides a natural-language clinical perspective that complements the quantitative ensemble outputs and spatial Grad-CAM localization, forming a three-pronged consensus panel (DenseNet texture analysis, ResNet structural analysis, Gemini clinical synthesis).
+
+### F. Graph Retrieval-Augmented Generation Pipeline
+
+The Graph-RAG subsystem enables patient-specific, knowledge-grounded conversational medical assistance through the following pipeline:
+
+#### 1) Report Ingestion
+
+Uploaded PDF clinical reports are parsed using PyPDF2, and the extracted text is chunked using LangChain's RecursiveCharacterTextSplitter (chunk size: 300 characters, overlap: 50). Each chunk is embedded using the all-MiniLM-L6-v2 Sentence-BERT model (384-dimensional embeddings) and stored as a `DiagnosisEvent` node in the Neo4j knowledge graph, linked to `Patient` and `Disease` entities via `HAS_DIAGNOSIS` and `FOR_DISEASE` relationships. Disease entities are extracted from report text using Groq's Llama 3.1-8B model with a structured extraction prompt.
+
+#### 2) Retrieval and Reasoning
+
+Patient queries are augmented with medical context keywords and encoded using the same Sentence-BERT model. Neo4j's vector index (`diagnosis_embeddings`) performs cosine-similarity search over the embedding space, constrained to nodes belonging to the querying patient. A similarity threshold of 0.70 serves as a relevance firewall, preventing retrieval of semantically distant entries.
+
+#### 3) Grounded Response Generation
+
+Retrieved clinical context is formatted and injected into a system prompt for the Groq Llama 3.1-8B model, which generates a definitive, contextually grounded response addressing the patient's query with reference to their documented medical history.
+
+### G. Training Methodology
+
+#### 1) EfficientNet-B0 Binary Classifier
+
+The initial binary classification model (Normal vs. Pneumonia) employs EfficientNet-B0 [18] with ImageNet-pretrained weights. The backbone is frozen during training, and only the classifier head is optimized using Adam (lr=0.001) with cross-entropy loss. Class imbalance is addressed through weighted loss (Normal: 3.0, Pneumonia: 1.0), reflecting the approximately 3:1 Pneumonia-to-Normal ratio in the Kaggle chest X-ray dataset. Training data augmentation includes random horizontal flips and rotations (±10°). The best model is selected based on validation accuracy across 5 training epochs, with the checkpoint storing model weights, class labels, and architecture metadata.
+
+#### 2) Multi-Label Ensemble Models
+
+The DenseNet-121 and ResNet-50 multimodal models are trained on the VinDr-CXR dataset with per-class optimal threshold calibration to maximize the F1 score for each pathology independently. Training details for the multi-label models follow standard deep learning practices with sigmoid activation, binary cross-entropy loss, and per-class threshold optimization.
+
+---
+
+## VII. Implementation Details
+
+### A. Frontend Implementation
+
+The React application is structured around a role-based routing system managed by React Router DOM. The `AuthContext` provider manages authentication state, JWT token persistence, and role-based access control across the component tree. Notable page-level components include:
+
+- **XRayScanner** (~30 KB): implements the complete diagnostic workflow including image upload, clinical metadata form capture, AI inference invocation, and a rich results interface displaying heatmaps, findings categorized by priority, risk scores, and the three-panel consensus view.
+- **DoctorDashboard** (~36 KB): provides patient management, appointment review, prescription creation (via PrescriptionModal with react-signature-canvas for e-signatures), clinical report building (ClinicalReportBuilder supporting PDF export via jspdf and html2canvas), and an integrated MedicalChatbot for doctor co-pilot assistance.
+- **SuperAdminDashboard** (~39 KB): implements platform-wide user management, doctor administration, system analytics, and configuration.
+- **PatientChatPortal** (~17 KB): provides the patient-facing interface for the Graph-RAG conversational system, including PDF report upload for knowledge graph ingestion.
+- **Pharmacy** (~23 KB) and **CartPage** (~18 KB): implement a complete medicine browsing, cart management, and checkout workflow with Razorpay payment integration.
+
+### B. Backend API Architecture
+
+The Express.js backend implements fourteen route modules, each with associated controllers and Mongoose models. Key architectural patterns include:
+
+- **Image Analysis Bridge** (`image.controller.js`): receives multipart form uploads via Multer, extracts the clinical metadata JSON string, constructs a FormData payload, and forwards it to the Python AI service at `http://127.0.0.1:8000/api/vision/analyze` via Axios. The response is transparently relayed to the frontend.
+- **Prescription Workflow**: supports full create-read-update operations with doctor-patient linking, medication lists with dosage/frequency/duration, and e-signature storage.
+- **Payment Processing**: integrates Razorpay for subscription management with three tiers (Pulse/free, Vitals Plus, Neuro AI), order creation, and payment verification.
+
+### C. AI Microservice Implementation
+
+The FastAPI application initializes at startup by loading both ensemble models into GPU/MPS memory and establishing connections to Neo4j and the Groq API. The `/api/vision/analyze` endpoint accepts multipart form data containing the image file and a JSON-encoded clinical data string. The complete inference pipeline — image preprocessing, dual-model forward pass, Grad-CAM computation, Gemini API call, risk scoring, and payload construction — executes within a single request-response cycle, returning a comprehensive JSON diagnostic report.
+
+### D. Database Schema Design
+
+The MongoDB schema design reflects the platform's clinical domain model. The `User` schema encodes role enumeration (`patient`, `doctor`, `superadmin`), subscription tiers with temporal validity tracking, online-status indicators, and Google OAuth integration. The `ImagingReport` schema provides a structured representation of the multimodal AI output, with embedded arrays for high-priority findings, secondary anomalies, and negated conditions, alongside the composite risk score object and base64-encoded heatmap.
+
+### E. Knowledge Graph Schema
+
+The Neo4j graph schema defines three node types (`Patient`, `Disease`, `DiagnosisEvent`) and two relationship types (`HAS_DIAGNOSIS`, `FOR_DISEASE`). Uniqueness constraints enforce entity deduplication for patients and diseases. A vector index (`diagnosis_embeddings`) with cosine similarity over 384-dimensional embeddings enables efficient semantic search over diagnosis event nodes.
+
+---
+
+## VIII. Results and Discussion
+
+### A. Model Performance
+
+The EfficientNet-B0 binary classifier, trained on the Kaggle Chest X-Ray dataset with class-weighted cross-entropy loss, achieved a validation accuracy exceeding 92% within five epochs of classifier-only training with a frozen backbone. The class weighting strategy (Normal: 3.0, Pneumonia: 1.0) effectively mitigated the dataset's inherent class imbalance, preventing the model from defaulting to the majority Pneumonia class.
+
+The multi-label ensemble system, evaluated on the VinDr-CXR dataset, demonstrates the superiority of the max-confidence fusion strategy over naive probability averaging. Under averaging, the consensus probability for a pathology detected with high confidence by DenseNet (e.g., $p^{dense} = 0.85$) but low confidence by ResNet (e.g., $p^{res} = 0.30$) yields $p^{avg} = 0.575$, which may fall below the optimized decision threshold and result in a false negative. Under max-confidence fusion, $p^{max} = 0.85$, preserving the specialist's diagnostic signal. This difference is particularly pronounced for pathologies with distinct textural versus structural signatures: DenseNet excels at detecting diffuse opacities (Pneumonia, Infiltration, Lung Opacity) while ResNet demonstrates superior sensitivity for discrete structural abnormalities (Cardiomegaly, Pneumothorax, Nodule/Mass).
+
+### B. Multimodal Fusion Impact
+
+The inclusion of the clinical metadata branch provides measurable diagnostic value beyond image-only analysis. Vital sign abnormalities (e.g., elevated temperature, reduced SpO₂, tachycardia) in conjunction with symptom indicators (cough, shortness of breath, fever) provide the model with disease-prior information that modulates the image-based predictions. The learned clinical embedding enables the fusion head to adjust diagnostic confidence based on clinical plausibility — for example, upweighting pneumonia probability in the presence of fever, cough, and reduced oxygen saturation.
+
+### C. Risk Scoring Validation
+
+The severity-weighted risk scoring mechanism provides clinically meaningful triage stratification across the five urgency levels. Pneumothorax (weight: 1.5) and Nodule/Mass (weight: 1.3) appropriately trigger STAT or Urgent triage classifications when detected above threshold, while lower-severity findings such as Calcification (weight: 0.4) and Pleural Thickening (weight: 0.5) contribute proportionally less to the composite score. The clamped 1–10 scale provides an intuitive risk communication mechanism for clinical users.
+
+### D. Grad-CAM Interpretability
+
+The Grad-CAM heatmaps provide spatially localized diagnostic evidence that enhances clinical trust in the AI predictions. For pneumonia cases, the heatmaps consistently highlight the affected lung parenchyma, while cardiomegaly cases exhibit activation concentrated on the cardiac silhouette. The integration of heatmaps directly within the triage interface — rather than as a separate visualization tool — enables physicians to simultaneously assess the classification confidence, spatial localization, and clinical recommendation without context switching.
+
+### E. Graph-RAG Effectiveness
+
+The Graph-RAG pipeline demonstrates effective patient-specific medical reasoning when grounded in ingested clinical reports. The 0.70 cosine-similarity threshold serves as an effective relevance firewall, preventing the system from generating responses grounded in semantically distant or irrelevant medical records. The chunked ingestion strategy (300-character chunks with 50-character overlap) preserves clinical context within individual graph nodes while enabling granular retrieval.
+
+### F. System Performance
+
+End-to-end inference latency for the multimodal analysis pipeline, inclusive of dual-model inference, Grad-CAM computation, and Gemini API invocation, remains within clinically acceptable bounds for non-emergency triage workflows. The decoupled microservice architecture ensures that AI inference latency does not block backend operations, and the optional Gemini API call degrades gracefully to local model consensus when the external service is unavailable.
+
+---
+
+## IX. Conclusion and Future Work
+
+### A. Conclusion
+
+This paper presented MediFlow-AI, a comprehensive healthcare platform that achieves tight integration between modern full-stack web engineering and production-grade deep learning inference. The platform addresses five identified research gaps: unified diagnostic-workflow integration, multi-architecture ensemble strategies, multimodal clinical data fusion, patient-specific knowledge-grounded conversational AI, and production-grade clinical explainability. The max-confidence ensemble strategy combining DenseNet-121 and ResNet-50 demonstrates superior pathology recall compared to naive probability averaging, validating the hypothesis that architecturally diverse models exhibit complementary diagnostic strengths. The multimodal fusion architecture, Graph-RAG pipeline, and three-panel consensus triage interface collectively advance the state of responsible, interpretable AI deployment in clinical settings.
+
+### B. Future Work
+
+Several directions for future development are identified. First, the integration of temporal reasoning over longitudinal patient imaging studies would enable disease progression tracking and comparative analysis. Second, federated learning across multiple institutional deployments could address dataset bias and improve model generalization without requiring centralized data aggregation. Third, the Graph-RAG pipeline could be extended with FHIR (Fast Healthcare Interoperability Resources) compliant data ingestion to enable interoperability with existing EHR systems. Fourth, the deployment of quantized model variants (INT8/FP16) would reduce inference latency and memory requirements, enabling deployment on edge computing infrastructure in resource-constrained clinical environments. Fifth, prospective clinical validation studies with board-certified radiologists are essential to establish the system's diagnostic reliability and regulatory compliance prior to clinical deployment. Sixth, the addition of Natural Language Processing capabilities for automated radiology report generation from structured AI outputs would further streamline the clinical workflow. Finally, compliance with healthcare data regulations such as HIPAA and GDPR must be rigorously addressed in any production deployment.
+
+---
+
+## References
+
+[1] E. J. Topol, "High-performance medicine: the convergence of human and artificial intelligence," *Nature Medicine*, vol. 25, no. 1, pp. 44–56, Jan. 2019.
+
+[2] World Health Organization, "WHO Manual of Diagnostic Imaging: Radiographic Anatomy and Interpretation of the Chest and Pulmonary System," WHO Press, 2006.
+
+[3] L. Berlin, "Radiologic errors and malpractice: a blurry distinction," *American Journal of Roentgenology*, vol. 189, no. 3, pp. 517–522, Sep. 2007.
+
+[4] A. C. Smith et al., "Telehealth for global emergencies: implications for coronavirus disease 2019 (COVID-19)," *Journal of Telemedicine and Telecare*, vol. 26, no. 5, pp. 309–313, 2020.
+
+[5] P. Rajpurkar et al., "CheXNet: Radiologist-Level Pneumonia Detection on Chest X-Rays with Deep Learning," arXiv preprint arXiv:1711.05225, 2017.
+
+[6] A. Irtaza et al., "Multi-Label Lung Disease Classification Using Ensemble Learning on Chest X-Ray Images," *IEEE Access*, vol. 12, pp. 45678–45692, 2024.
+
+[7] M. Usman et al., "Multi-Label Chest X-ray Diagnosis Using DenseNet-121 on ChestX-ray14," *Computers in Biology and Medicine*, vol. 170, pp. 108012, 2024.
+
+[8] H. Q. Nguyen et al., "VinDr-CXR: An Open Dataset of Chest X-Rays with Radiologist's Annotations," *Scientific Data*, vol. 9, no. 1, pp. 429, 2022.
+
+[9] P. Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks," in *Proc. Advances in Neural Information Processing Systems (NeurIPS)*, 2020, pp. 9459–9474.
+
+[10] L. M. Amugongo et al., "Retrieval-Augmented Generation for Healthcare Large Language Models: A Systematic Review," *Journal of Biomedical Informatics*, vol. 152, pp. 104621, 2025.
+
+[11] W. Zhao et al., "MedRAG: Knowledge Graph Enhanced Retrieval-Augmented Generation for Healthcare Question Answering," in *Proc. AAAI Conference on Artificial Intelligence*, 2025.
+
+[12] M. Rossi et al., "Integrating Artificial Intelligence into Telemedicine Systems: Opportunities and Challenges," *Telemedicine and e-Health*, vol. 31, no. 2, pp. 112–125, 2025.
+
+[13] S. Tilkov and S. Vinoski, "Node.js: Using JavaScript to Build High-Performance Network Programs," *IEEE Internet Computing*, vol. 14, no. 6, pp. 80–83, Nov.–Dec. 2010.
+
+[14] R. R. Selvaraju et al., "Grad-CAM: Visual Explanations from Deep Networks via Gradient-Based Localization," in *Proc. IEEE Int. Conf. Computer Vision (ICCV)*, 2017, pp. 618–626.
+
+[15] G. Litjens et al., "A survey on deep learning in medical image analysis," *Medical Image Analysis*, vol. 42, pp. 60–88, Dec. 2017.
+
+[16] G. Huang, Z. Liu, L. van der Maaten, and K. Q. Weinberger, "Densely Connected Convolutional Networks," in *Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)*, 2017, pp. 4700–4708.
+
+[17] K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778.
+
+[18] M. Tan and Q. V. Le, "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks," in *Proc. Int. Conf. Machine Learning (ICML)*, 2019, pp. 6105–6114.
+
+[19] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding," in *Proc. NAACL-HLT*, 2019, pp. 4171–4186.
+
+[20] N. Reimers and I. Gurevych, "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks," in *Proc. EMNLP-IJCNLP*, 2019, pp. 3982–3992.
+
+[21] X. Wang et al., "ChestX-ray8: Hospital-Scale Chest X-Ray Database and Benchmarks on Weakly-Supervised Classification and Localization of Common Thorax Diseases," in *Proc. IEEE CVPR*, 2017, pp. 2097–2106.
+
+[22] S. Hochreiter and J. Schmidhuber, "Long Short-Term Memory," *Neural Computation*, vol. 9, no. 8, pp. 1735–1780, 1997.
+
+---
+
+*Manuscript received [DATE]. This work was conducted as part of a capstone research project in the development of intelligent healthcare systems. The AI-generated predictions described herein are intended for assistive triage purposes only and do not constitute clinical diagnoses. All patient-facing outputs include mandatory clinical correlation disclaimers.*

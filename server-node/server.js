@@ -1,13 +1,12 @@
 const express = require("express");
 const dotenv = require("dotenv");
 
-// 🟢 CRITICAL FIX: Load .env BEFORE importing any routes or database models
 dotenv.config();
 
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-// Now it is safe to import routes (because .env is loaded)
+
 const medicineRoutes = require("./routes/medicine.route");
 const orderRoutes = require("./routes/order.route");
 const imageRoutes = require("./routes/image.route");
@@ -64,9 +63,9 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/admin", require("./routes/admin.route"));
 app.use("/api/lab-tests", require("./routes/labTest.route"));
 app.use("/api/users", require("./routes/user.route"));
-app.use("/api/prescriptions", require("./routes/prescription.route")); // 🟢 Prescriptions Route
+app.use("/api/prescriptions", require("./routes/prescription.route"));
 app.use("/api/vision", imageRoutes);
-app.use("/api/reports", require("./routes/report.route")); // 🟢 Clinical Reports Route
+app.use("/api/reports", require("./routes/report.route")); 
 app.use('/api/chats', require('./routes/chat.route'));
 app.use('/api/payments', require('./routes/payment.route'));
 

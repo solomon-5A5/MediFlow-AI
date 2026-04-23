@@ -127,7 +127,7 @@ const DoctorList = () => {
               </div>
 
               <div className="mb-4">
-                <h3 className="font-bold text-lg text-slate-800 group-hover:text-[#5747e6] transition-colors">Dr. {docName}</h3>
+                <h3 className="font-bold text-lg text-slate-800 group-hover:text-[#5747e6] transition-colors"> {docName}</h3>
                 <p className="text-sm text-slate-500 font-medium flex items-center gap-1"><Stethoscope className="w-3 h-3" /> {doc.specialization}</p>
               </div>
 
@@ -152,7 +152,7 @@ const DoctorList = () => {
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold font-display mb-1 text-slate-900">Dr. {selectedDoctor.name || selectedDoctor.userId?.fullName}</h3>
+            <h3 className="text-xl font-bold font-display mb-1 text-slate-900"> {selectedDoctor.name || selectedDoctor.userId?.fullName}</h3>
             <p className="text-sm text-slate-500 mb-6 flex items-center gap-1"><Stethoscope className="w-4 h-4" /> {selectedDoctor.specialization}</p>
 
             <form onSubmit={handleBook} className="space-y-4">

@@ -1,5 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// 🟢 NEW: Expandable Accordion Component for AI Reasoning
+const ReasoningBlock = ({ sources }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // If there are no sources, don't render anything
+  if (!sources || sources.length === 0) return null;
+
+  return (
+    <div className="mt-4">
+      {/* The Expand/Collapse Button */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 text-xs font-bold text-indigo-600/70 hover:text-indigo-800 transition-colors bg-white/50 px-3 py-1.5 rounded-full border border-indigo-100 shadow-sm"
+      >
+        <span className="material-symbols-outlined text-[16px]">
+          {isOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
+        </span>
+        {isOpen ? 'Hide' : 'View'} Clinical Reasoning
+      </button>
+
+      {/* The Hidden Content (Only shows when isOpen is true) */}
+      {isOpen && (
+        <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 mt-3 space-y-4 animate-in fade-in slide-in-from-top-2">
+          {sources.map((src, idx) => {
+            const matchPercentage = (src.similarity_score * 100).toFixed(1);
+            return (
+              <div key={idx} className="border-b border-white/20 pb-3 last:border-0 last:pb-0">
+                <div className="flex justify-between items-end mb-2">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-primary mb-1">Graph Match: {src.disease || 'Entity'}</p>
+                    <h4 className="font-headline font-bold text-lg">{matchPercentage}%</h4>
+                  </div>
+                </div>
+                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden mb-2">
+                  <div className="h-full bg-gradient-to-r from-primary to-indigo-400" style={{ width: `${matchPercentage}%` }}></div>
+                </div>
+                <div className="text-xs italic text-slate-600 border-l-2 border-primary/30 pl-3 line-clamp-2">
+                  "{src.notes}"
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function PatientChatPortal() {
   const user = { id: "P_DEFAULT" }; // Fallback. Change to useAuth() later!
 
@@ -326,29 +374,8 @@ export default function PatientChatPortal() {
                     
                     <p className="whitespace-pre-wrap">{msg.content}</p>
 
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 mt-4 space-y-4">
-                        {msg.sources.map((src, idx) => {
-                          const matchPercentage = (src.similarity_score * 100).toFixed(1);
-                          return (
-                            <div key={idx} className="border-b border-white/20 pb-3 last:border-0 last:pb-0">
-                              <div className="flex justify-between items-end mb-2">
-                                <div>
-                                  <p className="text-[10px] uppercase font-bold text-primary mb-1">Graph Match: {src.disease}</p>
-                                  <h4 className="font-headline font-bold text-lg">{matchPercentage}%</h4>
-                                </div>
-                              </div>
-                              <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden mb-2">
-                                <div className="h-full bg-gradient-to-r from-primary to-indigo-400" style={{ width: `${matchPercentage}%` }}></div>
-                              </div>
-                              <div className="text-xs italic text-slate-600 border-l-2 border-primary/30 pl-3 line-clamp-2">
-                                "{src.notes}"
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                    {/* 🟢 REPLACED: Calls the new expandable reasoning component */}
+                    <ReasoningBlock sources={msg.sources} />
 
                   </div>
                   

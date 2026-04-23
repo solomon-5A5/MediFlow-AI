@@ -9,14 +9,7 @@ module.exports = async function orchestrator(text, patientMeta) {
     for (const ref of allReferences) {
         const aliasList = ref.aliases.map(escapeRegExp).join('|');
 
-        // 🟢 THE GOD-MODE REGEX 🟢
-        // 1. Matches the Alias
-        // 2. Absorbs leader dots and noise: [\s\.:\-*_]*
-        // 3. Ignores H/L/* flags
-        // 4. THE CAPTURE GROUP NOW GRABS:
-        //    - Numbers with < or > signs (e.g., "< 0.5")
-        //    - Ratios (e.g., "1.5:1" or "0.8/1")
-        //    - Standard Medical Text (Positive, Negative, Reactive, Clear, etc.)
+
         const medicalText = "Positive|Negative|Reactive|Non-Reactive|Clear|Pale Yellow|Yellow|Trace|Absent|Present|Normal|Abnormal";
         const regex = new RegExp(`(?:${aliasList})[\\s\\.:\\-*_]*(?:[HL]\\s*|\\*\\s*)?([<>]?\\s*[\\d,]+\\.?\\d*(?:\\s*[:\\/]\\s*[\\d\\.]+)?|${medicalText})`, 'i');
 

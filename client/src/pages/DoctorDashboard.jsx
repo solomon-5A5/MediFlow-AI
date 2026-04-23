@@ -133,7 +133,7 @@ const DoctorDashboard = () => {
 
                     <div className="flex items-center gap-6">
                         <div className="text-right hidden xl:block font-display">
-                            <p className="text-sm font-bold text-[#100e1b] leading-tight">Dr. {user?.fullName || "Sarah Chen"}</p>
+                            <p className="text-sm font-bold text-[#100e1b] leading-tight"> {user?.fullName || "Sarah Chen"}</p>
                             <p className="text-xs text-[#575095] font-medium">Specialist</p>
                         </div>
                         <div className="w-10 h-10 bg-[#5747e6] rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-[#5747e6]/20">
