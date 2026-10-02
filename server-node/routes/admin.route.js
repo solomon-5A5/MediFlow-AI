@@ -49,7 +49,6 @@ router.post("/log-access", async (req, res) => {
   }
 });
 
-// ... (Keep the other routes for orders/appointments as they were) ...
 // 3. GET ALL ORDERS
 router.get("/all-orders", async (req, res) => {
   try {
@@ -59,7 +58,6 @@ router.get("/all-orders", async (req, res) => {
     res.status(500).json({ message: "Error fetching orders" });
   }
 });
-
 // 4. GET ALL APPOINTMENTS
 router.get("/all-appointments", async (req, res) => {
   try {
@@ -72,7 +70,6 @@ router.get("/all-appointments", async (req, res) => {
     res.status(500).json({ message: "Error fetching appointments" });
   }
 });
-
 // 5. GET ALL LAB APPOINTMENTS
 router.get("/all-lab-appointments", async (req, res) => {
   try {
@@ -80,7 +77,6 @@ router.get("/all-lab-appointments", async (req, res) => {
       .populate("patientId", "fullName email")
       // .populate("labAdminId", "name") // If you link to a specific lab tech
       .sort({ date: -1 });
-
     res.json(labAppts);
   } catch (error) {
     console.error("Fetch Lab Appointments Error:", error);

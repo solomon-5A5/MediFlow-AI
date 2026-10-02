@@ -7,13 +7,12 @@ const doctorSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  // --- UI FIELDS (Added) ---
-  name: { type: String, required: true }, // Easier to fetch than joining User table
+ 
+  name: { type: String, required: true }, 
   image: { type: String, default: "" },
   hospital: { type: String, default: "MediFlow General Hospital" },
   rating: { type: Number, default: 4.5 },
 
-  // --- YOUR EXISTING FIELDS ---
   specialization: {
     type: String,
     required: true,

@@ -37,27 +37,24 @@ val_loader = DataLoader(val_data, batch_size=32, shuffle=False)
 # Get dynamic class names from the folder structure
 class_names = train_data.classes
 
-# ✅ CHANGE 2: Handle Class Imbalance
-# Kaggle Pneumonia dataset has ~3x more Pneumonia images than Normal images.
-# We weight the minority class higher to prevent the AI from defaulting to Pneumonia.
+
 class_weights = torch.tensor([3.0, 1.0]).to(device)
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-# ⚡ OPTIONAL UPGRADE: EfficientNet-B0
+
 print("🧠 Loading EfficientNet-B0 backbone...")
 model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
 
-# ✅ CHANGE 1: Freeze Backbone First
-# Freeze all feature extraction layers to prevent destroying the pre-trained weights
+
 for param in model.parameters():
     param.requires_grad = False
 
-# Replace the classifier (PyTorch automatically sets requires_grad=True for new layers)
+
 num_ftrs = model.classifier[1].in_features
 model.classifier[1] = nn.Linear(num_ftrs, len(class_names))
 model = model.to(device)
 
-# ONLY pass the unfrozen classifier parameters to the optimizer
+
 optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
 
 epochs = 5
@@ -86,7 +83,7 @@ for epoch in range(epochs):
         
     train_loss = running_loss / len(train_loader)
 
-    # ✅ CHANGE 3: Add Validation Evaluation Each Epoch
+    # --- VALIDATION PHASE ---
     model.eval()
     val_loss = 0.0
     correct = 0
@@ -108,7 +105,7 @@ for epoch in range(epochs):
     
     print(f"📊 Epoch {epoch+1}: Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%")
 
-    # ✅ CHANGE 4 & 6: Save Best Model & Metadata Dictionary
+    
     if val_acc > best_val_acc:
         best_val_acc = val_acc
         print(f"⭐ New best validation accuracy! Saving checkpoint...")
